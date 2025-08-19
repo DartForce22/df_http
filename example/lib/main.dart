@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer';
 
 import 'package:df_http/df_http.dart';
 import 'package:flutter/material.dart';
@@ -15,41 +16,55 @@ class ExampleApp extends StatefulWidget {
 }
 
 class _ExampleAppState extends State<ExampleApp> {
-  late final HttpApiConfig apiConfig;
-  late final HttpApi httpApi;
+  late final DfHttpClientConfig apiConfig;
+  late final DfApiClient httpApi;
   String? hotCoffee;
   String? hotCoffeeImage;
   bool isLoadingCoffee = false;
 
   @override
   void initState() {
-    apiConfig = HttpApiConfig(
+    //Api config
+    apiConfig = DfHttpClientConfig(
       baseApiUrl: "https://api.sampleapis.com/",
       maxRetryAttempts: 3,
     );
-    httpApi = HttpApi(httpApiConfig: apiConfig);
+    httpApi = DfApiClient(httpApiConfig: apiConfig);
     super.initState();
   }
 
-  Future<Result<String, Exception>> getHotCoffee() async {
-    setState(() {
-      isLoadingCoffee = true;
-    });
+  //API Call
+  //Instead of the List<dynamic> in Result should be model class, this is used just for an example API call
+  Future<Result<List<dynamic>, Exception>> getHotCoffee() async {
     var res = await httpApi.get('coffee/hot');
 
     if (res?.statusCode == 200 && res?.body != null) {
-      setState(() {
-        isLoadingCoffee = false;
-        hotCoffee = jsonDecode(res!.body)[0]['title'];
-        hotCoffeeImage = jsonDecode(res.body)[0]['image'];
-      });
-      return Success(res!.body);
+      return Success(jsonDecode(res!.body));
     }
-
-    setState(() {
-      isLoadingCoffee = false;
-    });
     return Failure(Exception("No hot coffee found"));
+  }
+
+  void onGetHotCoffeePress() async {
+    setState(() {
+      isLoadingCoffee = true;
+    });
+    var res = await getHotCoffee();
+
+    switch (res) {
+      case Success(value: final value):
+        setState(() {
+          isLoadingCoffee = false;
+          hotCoffee = value[0]['title'];
+          hotCoffeeImage = value[0]['image'];
+        });
+        break;
+      case Failure(exception: final exception):
+        log(exception.toString());
+        setState(() {
+          isLoadingCoffee = false;
+        });
+        break;
+    }
   }
 
   @override
@@ -74,7 +89,7 @@ class _ExampleAppState extends State<ExampleApp> {
                         if (hotCoffeeImage != null)
                           Image.network(hotCoffeeImage!),
                         ElevatedButton(
-                          onPressed: getHotCoffee,
+                          onPressed: onGetHotCoffeePress,
                           child: Text("Get Hot Coffee"),
                         ),
                       ],

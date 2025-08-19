@@ -7,18 +7,18 @@ import 'package:http/http.dart';
 
 import '/models/models.dart';
 import '/utils/utils.dart';
-import 'http_api_config.dart';
+import 'df_http_client_config.dart';
 
 ///An instance of this class is used to make all API
 ///calls with predefined logic
-class HttpApi {
-  HttpApi({required this.httpApiConfig});
+class DfApiClient {
+  DfApiClient({required this.httpApiConfig});
 
-  HttpApi copyWith({HttpApiConfig? httpApiConfig}) {
-    return HttpApi(httpApiConfig: httpApiConfig ?? this.httpApiConfig);
+  DfApiClient copyWith({DfHttpClientConfig? httpApiConfig}) {
+    return DfApiClient(httpApiConfig: httpApiConfig ?? this.httpApiConfig);
   }
 
-  final HttpApiConfig httpApiConfig;
+  final DfHttpClientConfig httpApiConfig;
 
   ///This flag is used to determine whether the application can proceed with API calls,
   /// or all API calls have to be paused until token refreshing is done
