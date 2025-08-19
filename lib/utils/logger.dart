@@ -39,8 +39,9 @@ class Logger {
         break;
     }
 
-    String messageTag =
-        tag != null ? ' ${type.name}-$tag: ' : ' ${type.name} :';
+    String messageTag = tag != null
+        ? ' ${type.name}-$tag: '
+        : ' ${type.name} :';
 
     // Building the log message
     final baseMessage =
@@ -84,7 +85,8 @@ class Logger {
         break;
     }
 
-    final baseMessage = '''
+    final baseMessage =
+        '''
 $colorCode[$timestamp] $emoji API ${type.name.toUpperCase()}
 🔗 Path: $apiPath
 🔄 Method: $method

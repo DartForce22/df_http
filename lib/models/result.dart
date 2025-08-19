@@ -5,8 +5,7 @@ sealed class Result<S, E extends Exception> {
   const Result();
 }
 
-final class Success<S, E extends Exception>
-    extends Result<S, E> {
+final class Success<S, E extends Exception> extends Result<S, E> {
   const Success(this.value);
   final S value;
 }
