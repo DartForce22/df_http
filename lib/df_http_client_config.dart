@@ -7,8 +7,8 @@ import '/models/result.dart';
 ///
 /// This class defines how requests are made, retried, and how headers are
 /// handled. It also supports token refresh logic.
-class HttpApiConfig {
-  /// Creates a new [HttpApiConfig] instance.
+class DfHttpClientConfig {
+  /// Creates a new [DfHttpClientConfig] instance.
   ///
   /// [baseApiUrl] is required and should be the base URL for your API.
   ///
@@ -20,7 +20,7 @@ class HttpApiConfig {
   /// - [maxRetryAttempts]: Maximum number of retry attempts for failed requests.
   /// - [refreshToken]: Callback used to refresh tokens if authentication fails.
   ///
-  HttpApiConfig({
+  DfHttpClientConfig({
     required this.baseApiUrl,
     this.encoding,
     this.headers = const {},
@@ -68,8 +68,8 @@ class HttpApiConfig {
     return headers[HttpHeaders.authorizationHeader];
   }
 
-  HttpApiConfig clone() {
-    return HttpApiConfig(
+  DfHttpClientConfig clone() {
+    return DfHttpClientConfig(
       baseApiUrl: baseApiUrl,
       encoding: encoding,
       headers: {...headers},
@@ -80,7 +80,7 @@ class HttpApiConfig {
     );
   }
 
-  HttpApiConfig copyWith({
+  DfHttpClientConfig copyWith({
     String? baseApiUrl,
     Encoding? encoding,
     Map<String, String>? headers,
@@ -90,7 +90,7 @@ class HttpApiConfig {
     int? maxRetryAttempts,
     Future<Result<String, Exception>> Function()? refreshToken,
   }) {
-    return HttpApiConfig(
+    return DfHttpClientConfig(
       baseApiUrl: baseApiUrl ?? this.baseApiUrl,
       encoding: encoding ?? this.encoding,
       headers: headers ?? {...this.headers},
