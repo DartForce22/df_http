@@ -1,6 +1,6 @@
 import 'dart:developer' as developer;
 
-enum LogType { info, warning, error, success, debug }
+enum LogType { info, warning, error, success, debug, api }
 
 enum ApiLogType { request, response, error }
 
@@ -35,6 +35,10 @@ class Logger {
         break;
       case LogType.debug:
         emoji = '🐞';
+        colorCode = '\x1B[35m'; // Purple
+        break;
+      case LogType.api:
+        emoji = '👻';
         colorCode = '\x1B[35m'; // Purple
         break;
     }

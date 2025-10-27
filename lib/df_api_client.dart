@@ -25,12 +25,18 @@ class DfApiClient {
   static bool _refreshTokenInProgress = false;
 
   Future<Response?> get(String apiPath) async {
+    Logger.log(
+      "--------> START OF GET API CALL <--------",
+      type: LogType.api,
+      tag: "DF-API-CLIENT",
+    );
     final client = http.Client();
+    Uri apiUri = _generateApiUri(apiPath);
     return _processApiCall(
       httpApiConfig.maxRetryAttempts,
       apiCall: () async {
         return await client
-            .get(_generateApiUri(apiPath), headers: httpApiConfig.headers)
+            .get(apiUri, headers: httpApiConfig.headers)
             .timeout(
               Duration(seconds: httpApiConfig.timeout),
               onTimeout: () => throw Exception(
@@ -47,18 +53,24 @@ class DfApiClient {
     Object? body,
     bool jsonEncodeBody = true,
   }) async {
+    Logger.log(
+      "--------> START OF POST API CALL <--------",
+      type: LogType.api,
+      tag: "DF-API-CLIENT",
+    );
     Object? requestBody = body;
     final client = http.Client();
 
     if (jsonEncodeBody && body != null) {
       requestBody = jsonEncode(body);
     }
+    Uri apiUri = _generateApiUri(apiPath);
     return _processApiCall(
       httpApiConfig.maxRetryAttempts,
       apiCall: () async {
         return await client
             .post(
-              _generateApiUri(apiPath),
+              apiUri,
               encoding: httpApiConfig.encoding,
               body: requestBody,
               headers: httpApiConfig.headers,
@@ -79,18 +91,25 @@ class DfApiClient {
     Object? body,
     bool jsonEncodeBody = true,
   }) async {
+    Logger.log(
+      "--------> START OF PATCH API CALL <--------",
+      type: LogType.api,
+      tag: "DF-API-CLIENT",
+    );
     Object? requestBody = body;
     final client = http.Client();
 
     if (jsonEncodeBody && body != null) {
       requestBody = jsonEncode(body);
     }
+
+    Uri apiUri = _generateApiUri(apiPath);
     return _processApiCall(
       httpApiConfig.maxRetryAttempts,
       apiCall: () async {
         return await client
             .patch(
-              _generateApiUri(apiPath),
+              apiUri,
               encoding: httpApiConfig.encoding,
               body: requestBody,
               headers: httpApiConfig.headers,
@@ -111,6 +130,11 @@ class DfApiClient {
     Object? body,
     bool jsonEncodeBody = true,
   }) async {
+    Logger.log(
+      "--------> START OF PUT API CALL <--------",
+      type: LogType.api,
+      tag: "DF-API-CLIENT",
+    );
     Object? requestBody = body;
     final client = http.Client();
 
@@ -118,12 +142,13 @@ class DfApiClient {
       requestBody = jsonEncode(body);
     }
 
+    Uri apiUri = _generateApiUri(apiPath);
     return _processApiCall(
       httpApiConfig.maxRetryAttempts,
       apiCall: () async {
         return await client
             .put(
-              _generateApiUri(apiPath),
+              apiUri,
               encoding: httpApiConfig.encoding,
               body: requestBody,
               headers: httpApiConfig.headers,
@@ -150,12 +175,13 @@ class DfApiClient {
     if (jsonEncodeBody && body != null) {
       requestBody = jsonEncode(body);
     }
+    Uri apiUri = _generateApiUri(apiPath);
     return _processApiCall(
       httpApiConfig.maxRetryAttempts,
       apiCall: () async {
         return await client
             .delete(
-              _generateApiUri(apiPath),
+              apiUri,
               encoding: httpApiConfig.encoding,
               body: requestBody,
               headers: httpApiConfig.headers,
@@ -176,6 +202,11 @@ class DfApiClient {
     required Future<Response> Function() apiCall,
     required VoidCallback onFinish,
   }) async {
+    Logger.log(
+      "--------> PROCESSING API CALL",
+      type: LogType.api,
+      tag: "DF-API-CLIENT",
+    );
     Response? res;
     final retryPauseDuration =
         500 * ((httpApiConfig.maxRetryAttempts + 1) - retryCount);
@@ -191,18 +222,18 @@ class DfApiClient {
         switch (refreshTokenResult) {
           case Success(value: final _):
             Logger.log(
-              "Refreshing token success",
-              tag: 'processApiCall',
-              type: LogType.error,
+              "--------> REFRESHING TOKEN SUCCESS",
+              type: LogType.success,
+              tag: "DF-API-CLIENT",
             );
             _refreshTokenInProgress = false;
             break;
           case Failure(exception: final exception):
             _refreshTokenInProgress = false;
             Logger.log(
-              "Refreshing token failed: $exception",
-              tag: 'processApiCall',
+              "--------> REFRESHING TOKEN FAILED: $exception",
               type: LogType.error,
+              tag: "DF-API-CLIENT",
             );
             break;
         }
@@ -215,7 +246,11 @@ class DfApiClient {
         httpApiConfig.authorizationPresent() &&
         httpApiConfig.waitForTokenRefresh) {
       await Future.delayed(const Duration(milliseconds: 400), () {
-        Logger.log("Waiting for token to refresh");
+        Logger.log(
+          "--------> REFRESHING TOKEN",
+          type: LogType.warning,
+          tag: "DF-API-CLIENT",
+        );
       });
     }
 
@@ -242,17 +277,17 @@ class DfApiClient {
           connected = await hasInternetConnection();
 
           Logger.log(
-            'Checking internet connection',
-            tag: "processApiCall-apiResponse",
-            type: LogType.debug,
+            '--------> CHECKING INTERNET CONNECTION',
+            type: LogType.warning,
+            tag: "DF-API-CLIENT",
           );
         }
       }
 
       Logger.log(
-        '$e \nRequest url= ${res?.request?.url}\nResponse body= ${res?.body}',
-        tag: "processApiCall-apiResponse",
+        '--------> $e \n API CALL EXCEPTION \n RESPONSE BODY= ${res?.body}',
         type: LogType.error,
+        tag: "DF-API-CLIENT",
       );
       //Exception needs to be handled
     }
@@ -260,6 +295,11 @@ class DfApiClient {
     if (res == null || res.statusCode == 502 || res.statusCode == 503) {
       //If API call failed, this will retry API request
       if (retryCount > 0) {
+        Logger.log(
+          '--------> RETRY API CALL AFTER $retryPauseDuration milliseconds - $retryCount RETRIES LEFT',
+          type: LogType.warning,
+          tag: "DF-API-CLIENT",
+        );
         await Future<void>.delayed(Duration(milliseconds: retryPauseDuration));
         return _processApiCall(
           --retryCount,
@@ -269,10 +309,30 @@ class DfApiClient {
       }
     }
     onFinish();
+    Logger.log(
+      "--------> API RESPONSE STATUS CODE ${res?.statusCode}",
+      type: LogType.api,
+      tag: "DF-API-CLIENT",
+    );
+    Logger.log(
+      "--------> END OF API CALL <--------\n",
+      type: LogType.api,
+      tag: "DF-API-CLIENT",
+    );
     return res;
   }
 
   Uri _generateApiUri(String apiPath) {
+    Logger.log(
+      "--------> GENERATING API URL",
+      type: LogType.api,
+      tag: "DF-API-CLIENT",
+    );
+    Logger.log(
+      "--------> API URL '${httpApiConfig.baseApiUrl}$apiPath'",
+      type: LogType.api,
+      tag: "DF-API-CLIENT",
+    );
     return Uri.parse('${httpApiConfig.baseApiUrl}$apiPath');
   }
 
