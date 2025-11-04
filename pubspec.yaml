@@ -1,7 +1,7 @@
 name: df_http
 description: "Flutter networking helper package that extends the official http client with built-in retries, token refresh, and request/response processing for easier API integration."
 
-version: 1.0.0
+version: 1.0.1
 
 homepage: https://dartforce.dev/
 repository: https://github.com/DartForce22/df_http.git
@@ -13,6 +13,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  firebase_crashlytics: ^4.3.9
     
   http: ^1.5.0
 

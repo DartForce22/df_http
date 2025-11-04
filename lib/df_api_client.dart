@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
 
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/http.dart';
 
@@ -256,7 +257,7 @@ class DfApiClient {
 
     try {
       res = await apiCall();
-    } catch (e) {
+    } catch (e, s) {
       if (e is SocketException) {
         //Checks if there is internet connection
         var connected = await hasInternetConnection();
@@ -282,6 +283,20 @@ class DfApiClient {
             tag: "DF-API-CLIENT",
           );
         }
+
+        try {
+          await FirebaseCrashlytics.instance.recordError(
+            e,
+            s,
+            reason: 'a non-fatal error',
+            information: ['df_http'],
+          );
+        } catch (e) {
+          Logger.log(
+            "Failed logging to firebase crashlytics: $e",
+            type: LogType.warning,
+          );
+        }
       }
 
       Logger.log(
@@ -300,6 +315,19 @@ class DfApiClient {
           type: LogType.warning,
           tag: "DF-API-CLIENT",
         );
+        try {
+          await FirebaseCrashlytics.instance.recordError(
+            '--------> RETRY API (${res?.request?.url}) CALL AFTER $retryPauseDuration milliseconds - $retryCount RETRIES LEFT',
+            null,
+            reason: 'a non-fatal error',
+            information: ['df_http'],
+          );
+        } catch (e) {
+          Logger.log(
+            "Failed logging to firebase crashlytics: $e",
+            type: LogType.warning,
+          );
+        }
         await Future<void>.delayed(Duration(milliseconds: retryPauseDuration));
         return _processApiCall(
           --retryCount,
