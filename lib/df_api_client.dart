@@ -3,12 +3,12 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:df_http/df_http.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/http.dart';
 
 import '/utils/utils.dart';
-import 'df_http_client_config.dart';
 
 const List<int> _retryStatusCodes = [502, 503, 504, 429];
 const int maxDelayMs = 60000;
@@ -44,7 +44,7 @@ class DfApiClient {
 
   ///This flag is used to determine whether the application can proceed with API calls,
   /// or all API calls have to be paused until token refreshing is done
-  static Completer<void>? _refreshCompleter;
+  Completer<void>? _refreshCompleter;
 
   /// Used to generate random jitter value for the retry waiting time
   final _rand = Random();
@@ -340,7 +340,10 @@ class DfApiClient {
         type: LogType.error,
         tag: "DF-API-CLIENT",
       );
-      //Exception needs to be handled
+
+      if (retryCount == 0) {
+        rethrow;
+      }
     }
 
     // Retry on gateway/server errors
@@ -438,10 +441,18 @@ class DfApiClient {
         //THE ASYNC WORK
         //Any other request that enters now
         //will see _refreshCompleter != null and hit the 'while' loop above.
-        await httpApiConfig.refreshToken!().timeout(
+        var res = await httpApiConfig.refreshToken!().timeout(
           const Duration(seconds: 20),
           onTimeout: () => throw TimeoutException("Token refresh timed out"),
         );
+
+        switch (res) {
+          case Success(value: final _):
+            Logger.log("REFRESHING TOKEN SUCCESSFUL", type: LogType.api);
+            break;
+          case Failure(exception: Exception e):
+            throw TimeoutException("Token refresh failed $e");
+        }
       } finally {
         //THE RELEASE
         _refreshCompleter?.complete();
