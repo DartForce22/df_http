@@ -17,3 +17,4 @@
 - Replaced linear pause with exponential backoff + jitter
 - Added the dispose method
 - Changed refresh token logic to fix concurrent calls issue
+- Added the onConnectivityChanged stream in order to notify UI about network changes.

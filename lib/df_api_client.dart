@@ -31,6 +31,12 @@ class DfApiClient {
 
   final httpClient = http.Client();
 
+  /// Global stream to notify the UI about internet connection status
+  static final StreamController<bool> _connectionController =
+      StreamController<bool>.broadcast();
+
+  static Stream<bool> get onConnectivityChanged => _connectionController.stream;
+
   /// Use [DfApiClient] constructor instead.
   @Deprecated(
     'Use [DfApiClient] constructor instead, copyWith will be removed in future versions.',
@@ -280,6 +286,9 @@ class DfApiClient {
       res = await apiCall();
     } catch (e, s) {
       if (e is SocketException) {
+        // Notify UI that we lost connection
+        _connectionController.add(false);
+
         //Checks if there is internet connection
         var connected = await hasInternetConnection();
         var maxConnectionCheckingAttempts = 5;
@@ -307,7 +316,10 @@ class DfApiClient {
           );
         }
 
-        if (!connected) {
+        if (connected) {
+          // Notify UI that we are back online
+          _connectionController.add(true);
+        } else {
           Logger.log(
             'No internet after $maxConnectionCheckingAttempts attempts',
             type: LogType.error,
