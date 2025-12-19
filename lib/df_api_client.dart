@@ -10,7 +10,7 @@ import 'package:http/http.dart';
 
 import '/utils/utils.dart';
 
-const List<int> _retryStatusCodes = [502, 503, 504, 429];
+const List<int> _retryStatusCodes = [502, 503, 504];
 const int maxDelayMs = 60000;
 
 /// Centralized HTTP API client used for all network calls.
