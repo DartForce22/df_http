@@ -12,6 +12,9 @@ import '/models/models.dart';
 import '/utils/utils.dart';
 import 'df_http_client_config.dart';
 
+const List<int> _retryStatusCodes = [502, 503, 504, 429];
+const int maxDelayMs = 60000;
+
 /// Centralized HTTP API client used for all network calls.
 ///
 /// `DfApiClient` wraps the `http` package and provides:
@@ -42,6 +45,9 @@ class DfApiClient {
   ///This flag is used to determine whether the application can proceed with API calls,
   /// or all API calls have to be paused until token refreshing is done
   static Completer<void>? _refreshCompleter;
+
+  /// Used to generate random jitter value for the retry waiting time
+  final _rand = Random();
 
   /// Executes a HTTP GET request for the given [apiPath].
   ///
@@ -267,10 +273,16 @@ class DfApiClient {
     // Exponential backoff with jitter
     final attemptsUsed = (httpApiConfig.maxRetryAttempts - retryCount);
     final baseMs = 500; // base delay in ms
+    final cappedAttempts = min(attemptsUsed, 10); // prevents huge shifts
     final exponential =
-        baseMs * (1 << attemptsUsed); // base * 2^attemptsUsed
-    final jitter = Random().nextInt(200); // 0..199 ms jitter
-    final retryPauseDurationMs = exponential + jitter;
+        baseMs * (1 << cappedAttempts); // base * 2^cappedAttempts
+    final jitter = _rand.nextInt(200); // 0..199 ms jitter
+    var retryPauseDurationMs = exponential + jitter;
+
+    //Prevents too long retry awaits
+    if (retryPauseDurationMs > maxDelayMs) {
+      retryPauseDurationMs = maxDelayMs;
+    }
 
     // Handle token refresh if authorization is present and token is expired
     if (httpApiConfig.refreshToken != null &&
@@ -328,11 +340,13 @@ class DfApiClient {
       if (e is SocketException) {
         //Checks if there is internet connection
         var connected = await hasInternetConnection();
+        var maxConnectionCheckingAttempts = 5;
 
         //Seconds to wait before checking internet connection again
         var secondsToWait = 5;
 
-        while (!connected) {
+        while (!connected && maxConnectionCheckingAttempts > 0) {
+          maxConnectionCheckingAttempts--;
           await Future<void>.delayed(Duration(seconds: secondsToWait));
 
           if (secondsToWait < 10) {
@@ -351,6 +365,15 @@ class DfApiClient {
           );
         }
 
+        if (!connected) {
+          Logger.log(
+            'No internet after $maxConnectionCheckingAttempts attempts',
+            type: LogType.error,
+          );
+          // either rethrow a SocketException or return null to let caller handle
+          throw SocketException('No internet connection');
+        }
+
         try {
           await FirebaseCrashlytics.instance.recordError(
             e,
@@ -365,9 +388,13 @@ class DfApiClient {
           );
         }
       }
+      final body = res?.body ?? '';
+      final snippet = body.length > 200
+          ? '${body.substring(0, 200)}... (truncated)'
+          : body;
 
       Logger.log(
-        '--------> $e \n API CALL EXCEPTION \n RESPONSE BODY= ${res?.body}',
+        '--------> $e \n API CALL EXCEPTION \n RESPONSE BODY= $snippet',
         type: LogType.error,
         tag: "DF-API-CLIENT",
       );
@@ -375,7 +402,7 @@ class DfApiClient {
     }
 
     // Retry on gateway/server errors
-    if (res == null || res.statusCode == 502 || res.statusCode == 503) {
+    if (res == null || _retryStatusCodes.contains(res.statusCode)) {
       //If API call failed, this will retry API request
       if (retryCount > 0) {
         Logger.log(
@@ -397,10 +424,12 @@ class DfApiClient {
           );
         }
 
-        await Future<void>.delayed(Duration(milliseconds: retryPauseDurationMs));
+        await Future<void>.delayed(
+          Duration(milliseconds: retryPauseDurationMs),
+        );
         return _processApiCall(
           apiPath: apiPath,
-          --retryCount,
+          retryCount - 1,
           apiCall: apiCall,
           onFinish: onFinish,
         );
