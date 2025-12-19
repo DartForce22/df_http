@@ -29,7 +29,7 @@ Create a DfHttpClientConfig instance. This object holds all your API settings, r
 import 'package:df_http/df_http.dart';
 
 final config = DfHttpClientConfig(
-  baseApiUrl: '[https://api.example.com](https://api.example.com)',
+  baseApiUrl: 'https://api.example.com',
   timeout: 15, // seconds
   maxRetryAttempts: 3,
   headers: {
@@ -82,7 +82,7 @@ By default, the package pings example.com. For custom environments (like interna
 ```dart
 internetConnectionCheck: () async {
   // Use your own heartbeat endpoint
-  final res = await http.get(Uri.parse('[https://my-status-page.com](https://my-status-page.com)'));
+  final res = await http.get(Uri.parse('https://my-status-page.com'));
   return res.statusCode == 200;
 },
 ```
