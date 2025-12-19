@@ -20,6 +20,7 @@ class DfHttpClientConfig {
   /// - [waitForTokenRefresh]: Whether requests should wait until token refresh completes.
   /// - [maxRetryAttempts]: Maximum number of retry attempts for failed requests.
   /// - [refreshToken]: Callback used to refresh tokens if authentication fails.
+  /// - [maxDelayMs]: Represent the maximum waiting time on API retry. Default set to _60000ms_
   /// ---
   /// - [random]: Provide a "seeded" Random in tests so that the retry delay is predictable
   ///
@@ -32,12 +33,11 @@ class DfHttpClientConfig {
     this.waitForTokenRefresh = true,
     this.maxRetryAttempts = 3,
     this.refreshToken,
+    this.maxDelayMs = 60000,
     Random? random,
   }) : _rand = random ?? Random();
 
-  ///Represent the maximum waiting time on API retry
-  ///- Default set to _60000ms_
-  final int maxDelayMs = 60000;
+  final int maxDelayMs;
   final String baseApiUrl;
   final Encoding? encoding;
   Map<String, String> headers;
