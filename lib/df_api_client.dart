@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'dart:ui';
 
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -262,8 +263,14 @@ class DfApiClient {
       tag: "DF-API-CLIENT",
     );
     Response? res;
-    final retryPauseDuration =
-        500 * ((httpApiConfig.maxRetryAttempts + 1) - retryCount);
+
+    // Exponential backoff with jitter
+    final attemptsUsed = (httpApiConfig.maxRetryAttempts - retryCount);
+    final baseMs = 500; // base delay in ms
+    final exponential =
+        baseMs * (1 << attemptsUsed); // base * 2^attemptsUsed
+    final jitter = Random().nextInt(200); // 0..199 ms jitter
+    final retryPauseDurationMs = exponential + jitter;
 
     // Handle token refresh if authorization is present and token is expired
     if (httpApiConfig.refreshToken != null &&
@@ -273,7 +280,12 @@ class DfApiClient {
         _refreshCompleter = Completer();
 
         try {
-          var refreshTokenResult = await httpApiConfig.refreshToken!();
+          var refreshTokenResult = await httpApiConfig.refreshToken!().timeout(
+            Duration(seconds: 15),
+            onTimeout: () {
+              throw TimeoutException("Token refresh timed out");
+            },
+          );
 
           switch (refreshTokenResult) {
             case Success(value: final _):
@@ -367,13 +379,13 @@ class DfApiClient {
       //If API call failed, this will retry API request
       if (retryCount > 0) {
         Logger.log(
-          '--------> RETRY API CALL AFTER $retryPauseDuration milliseconds - $retryCount RETRIES LEFT',
+          '--------> RETRY API CALL AFTER $retryPauseDurationMs milliseconds - $retryCount RETRIES LEFT',
           type: LogType.warning,
           tag: "DF-API-CLIENT",
         );
         try {
           await FirebaseCrashlytics.instance.recordError(
-            '--------> RETRY API PATH=($apiPath) CALL AFTER $retryPauseDuration milliseconds - $retryCount RETRIES LEFT',
+            '--------> RETRY API PATH=($apiPath) CALL AFTER $retryPauseDurationMs milliseconds - $retryCount RETRIES LEFT',
             null,
             reason: 'a non-fatal error',
             information: ['df_http'],
@@ -384,7 +396,8 @@ class DfApiClient {
             type: LogType.warning,
           );
         }
-        await Future<void>.delayed(Duration(milliseconds: retryPauseDuration));
+
+        await Future<void>.delayed(Duration(milliseconds: retryPauseDurationMs));
         return _processApiCall(
           apiPath: apiPath,
           --retryCount,

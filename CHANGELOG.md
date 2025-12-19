@@ -14,3 +14,4 @@
 
 - Fixed firebase crashlytics API path logging
 - Added code docs for the df_api_client class
+- Replaced linear pause with exponential backoff + jitter
