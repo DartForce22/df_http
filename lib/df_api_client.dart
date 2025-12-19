@@ -10,21 +10,44 @@ import '/models/models.dart';
 import '/utils/utils.dart';
 import 'df_http_client_config.dart';
 
-///An instance of this class is used to make all API
-///calls with predefined logic
+/// Centralized HTTP API client used for all network calls.
+///
+/// `DfApiClient` wraps the `http` package and provides:
+/// - Unified GET/POST/PUT/PATCH/DELETE methods
+/// - Automatic retry logic
+/// - Token refresh handling
+/// - Network connectivity checks
+/// - Timeout handling
+/// - Firebase Crashlytics error reporting
+///
+/// All requests are executed using configuration provided by
+/// [DfHttpClientConfig].
 class DfApiClient {
+  /// Creates a new API client with the given HTTP configuration.
   DfApiClient({required this.httpApiConfig});
 
+  /// Returns a copy of this client with updated configuration.
+  ///
+  /// Useful when only part of the configuration needs to be changed
+  /// (e.g. headers, base URL, timeout).
   DfApiClient copyWith({DfHttpClientConfig? httpApiConfig}) {
     return DfApiClient(httpApiConfig: httpApiConfig ?? this.httpApiConfig);
   }
 
+  /// HTTP configuration used for all API calls.
   final DfHttpClientConfig httpApiConfig;
 
   ///This flag is used to determine whether the application can proceed with API calls,
   /// or all API calls have to be paused until token refreshing is done
   static bool _refreshTokenInProgress = false;
 
+  /// Executes a HTTP GET request for the given [apiPath].
+  ///
+  /// Applies:
+  /// - Base URL resolution
+  /// - Authorization headers
+  /// - Timeout handling
+  /// - Retry logic
   Future<Response?> get(String apiPath) async {
     Logger.log(
       "--------> START OF GET API CALL <--------",
@@ -34,6 +57,7 @@ class DfApiClient {
     final client = http.Client();
     Uri apiUri = _generateApiUri(apiPath);
     return _processApiCall(
+      apiPath: apiPath,
       httpApiConfig.maxRetryAttempts,
       apiCall: () async {
         return await client
@@ -49,6 +73,10 @@ class DfApiClient {
     );
   }
 
+  /// Executes a HTTP POST request for the given [apiPath].
+  ///
+  /// If [jsonEncodeBody] is `true`, the [body] will be JSON-encoded
+  /// before sending.
   Future<Response?> post(
     String apiPath, {
     Object? body,
@@ -67,6 +95,7 @@ class DfApiClient {
     }
     Uri apiUri = _generateApiUri(apiPath);
     return _processApiCall(
+      apiPath: apiPath,
       httpApiConfig.maxRetryAttempts,
       apiCall: () async {
         return await client
@@ -87,6 +116,9 @@ class DfApiClient {
     );
   }
 
+  /// Executes a HTTP PATCH request for the given [apiPath].
+  ///
+  /// If [jsonEncodeBody] is `true`, the [body] will be JSON-encoded.
   Future<Response?> patch(
     String apiPath, {
     Object? body,
@@ -106,6 +138,7 @@ class DfApiClient {
 
     Uri apiUri = _generateApiUri(apiPath);
     return _processApiCall(
+      apiPath: apiPath,
       httpApiConfig.maxRetryAttempts,
       apiCall: () async {
         return await client
@@ -126,6 +159,9 @@ class DfApiClient {
     );
   }
 
+  /// Executes a HTTP PUT request for the given [apiPath].
+  ///
+  /// If [jsonEncodeBody] is `true`, the [body] will be JSON-encoded.
   Future<Response?> put(
     String apiPath, {
     Object? body,
@@ -145,6 +181,7 @@ class DfApiClient {
 
     Uri apiUri = _generateApiUri(apiPath);
     return _processApiCall(
+      apiPath: apiPath,
       httpApiConfig.maxRetryAttempts,
       apiCall: () async {
         return await client
@@ -165,6 +202,9 @@ class DfApiClient {
     );
   }
 
+  /// Executes a HTTP DELETE request for the given [apiPath].
+  ///
+  /// Supports an optional request body and JSON encoding.
   Future<Response?> delete(
     String apiPath, {
     Object? body,
@@ -178,6 +218,7 @@ class DfApiClient {
     }
     Uri apiUri = _generateApiUri(apiPath);
     return _processApiCall(
+      apiPath: apiPath,
       httpApiConfig.maxRetryAttempts,
       apiCall: () async {
         return await client
@@ -198,9 +239,20 @@ class DfApiClient {
     );
   }
 
+  /// Core request execution pipeline.
+  ///
+  /// Responsibilities:
+  /// - Token expiration detection
+  /// - Token refresh synchronization
+  /// - Retry handling for failed requests
+  /// - Internet connectivity recovery
+  /// - Crashlytics logging
+  ///
+  /// [retryCount] determines how many retry attempts are still allowed.
   Future<Response?> _processApiCall(
     int retryCount, {
     required Future<Response> Function() apiCall,
+    required String apiPath,
     required VoidCallback onFinish,
   }) async {
     Logger.log(
@@ -212,6 +264,7 @@ class DfApiClient {
     final retryPauseDuration =
         500 * ((httpApiConfig.maxRetryAttempts + 1) - retryCount);
 
+    // Handle token refresh if authorization is present and token is expired
     if (httpApiConfig.refreshToken != null &&
         httpApiConfig.authorizationPresent() &&
         !_refreshTokenInProgress) {
@@ -307,6 +360,7 @@ class DfApiClient {
       //Exception needs to be handled
     }
 
+    // Retry on gateway/server errors
     if (res == null || res.statusCode == 502 || res.statusCode == 503) {
       //If API call failed, this will retry API request
       if (retryCount > 0) {
@@ -317,7 +371,7 @@ class DfApiClient {
         );
         try {
           await FirebaseCrashlytics.instance.recordError(
-            '--------> RETRY API (${res?.request?.url}) CALL AFTER $retryPauseDuration milliseconds - $retryCount RETRIES LEFT',
+            '--------> RETRY API PATH=($apiPath) CALL AFTER $retryPauseDuration milliseconds - $retryCount RETRIES LEFT',
             null,
             reason: 'a non-fatal error',
             information: ['df_http'],
@@ -330,6 +384,7 @@ class DfApiClient {
         }
         await Future<void>.delayed(Duration(milliseconds: retryPauseDuration));
         return _processApiCall(
+          apiPath: apiPath,
           --retryCount,
           apiCall: apiCall,
           onFinish: onFinish,
@@ -350,6 +405,7 @@ class DfApiClient {
     return res;
   }
 
+  /// Builds the full request [Uri] from the base API URL and [apiPath].
   Uri _generateApiUri(String apiPath) {
     Logger.log(
       "--------> GENERATING API URL",
@@ -364,6 +420,9 @@ class DfApiClient {
     return Uri.parse('${httpApiConfig.baseApiUrl}$apiPath');
   }
 
+  /// Checks whether the device currently has an active internet connection.
+  ///
+  /// Returns `true` if DNS lookup succeeds, otherwise `false`.
   Future<bool> hasInternetConnection() async {
     try {
       final result = await InternetAddress.lookup('example.com');

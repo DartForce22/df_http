@@ -20,4 +20,4 @@ Add `df_http` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  df_http: ^0.0.1
+  df_http: latest_version

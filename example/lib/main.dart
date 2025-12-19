@@ -26,7 +26,7 @@ class _ExampleAppState extends State<ExampleApp> {
   void initState() {
     //Api config
     apiConfig = DfHttpClientConfig(
-      baseApiUrl: "https://api.sampleapis.com/",
+      baseApiUrl: "https://api.sample2apis.com/",
       maxRetryAttempts: 3,
     );
     httpApi = DfApiClient(httpApiConfig: apiConfig);
