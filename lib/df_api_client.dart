@@ -31,6 +31,8 @@ class DfApiClient {
   /// Creates a new API client with the given HTTP configuration.
   DfApiClient({required this.httpApiConfig});
 
+  final httpClient = http.Client();
+
   /// Returns a copy of this client with updated configuration.
   ///
   /// Useful when only part of the configuration needs to be changed
@@ -62,13 +64,12 @@ class DfApiClient {
       type: LogType.api,
       tag: "DF-API-CLIENT",
     );
-    final client = http.Client();
     Uri apiUri = _generateApiUri(apiPath);
     return _processApiCall(
       apiPath: apiPath,
       httpApiConfig.maxRetryAttempts,
       apiCall: () async {
-        return await client
+        return await httpClient
             .get(apiUri, headers: httpApiConfig.headers)
             .timeout(
               Duration(seconds: httpApiConfig.timeout),
@@ -77,7 +78,6 @@ class DfApiClient {
               ),
             );
       },
-      onFinish: client.close,
     );
   }
 
@@ -96,7 +96,6 @@ class DfApiClient {
       tag: "DF-API-CLIENT",
     );
     Object? requestBody = body;
-    final client = http.Client();
 
     if (jsonEncodeBody && body != null) {
       requestBody = jsonEncode(body);
@@ -106,7 +105,7 @@ class DfApiClient {
       apiPath: apiPath,
       httpApiConfig.maxRetryAttempts,
       apiCall: () async {
-        return await client
+        return await httpClient
             .post(
               apiUri,
               encoding: httpApiConfig.encoding,
@@ -120,7 +119,6 @@ class DfApiClient {
               ),
             );
       },
-      onFinish: client.close,
     );
   }
 
@@ -138,7 +136,6 @@ class DfApiClient {
       tag: "DF-API-CLIENT",
     );
     Object? requestBody = body;
-    final client = http.Client();
 
     if (jsonEncodeBody && body != null) {
       requestBody = jsonEncode(body);
@@ -149,7 +146,7 @@ class DfApiClient {
       apiPath: apiPath,
       httpApiConfig.maxRetryAttempts,
       apiCall: () async {
-        return await client
+        return await httpClient
             .patch(
               apiUri,
               encoding: httpApiConfig.encoding,
@@ -163,7 +160,6 @@ class DfApiClient {
               ),
             );
       },
-      onFinish: client.close,
     );
   }
 
@@ -181,7 +177,6 @@ class DfApiClient {
       tag: "DF-API-CLIENT",
     );
     Object? requestBody = body;
-    final client = http.Client();
 
     if (jsonEncodeBody && body != null) {
       requestBody = jsonEncode(body);
@@ -192,7 +187,7 @@ class DfApiClient {
       apiPath: apiPath,
       httpApiConfig.maxRetryAttempts,
       apiCall: () async {
-        return await client
+        return await httpClient
             .put(
               apiUri,
               encoding: httpApiConfig.encoding,
@@ -206,7 +201,6 @@ class DfApiClient {
               ),
             );
       },
-      onFinish: client.close,
     );
   }
 
@@ -219,7 +213,6 @@ class DfApiClient {
     bool jsonEncodeBody = true,
   }) async {
     Object? requestBody = body;
-    final client = http.Client();
 
     if (jsonEncodeBody && body != null) {
       requestBody = jsonEncode(body);
@@ -229,7 +222,7 @@ class DfApiClient {
       apiPath: apiPath,
       httpApiConfig.maxRetryAttempts,
       apiCall: () async {
-        return await client
+        return await httpClient
             .delete(
               apiUri,
               encoding: httpApiConfig.encoding,
@@ -243,7 +236,6 @@ class DfApiClient {
               ),
             );
       },
-      onFinish: client.close,
     );
   }
 
@@ -261,7 +253,6 @@ class DfApiClient {
     int retryCount, {
     required Future<Response> Function() apiCall,
     required String apiPath,
-    required VoidCallback onFinish,
   }) async {
     Logger.log(
       "--------> PROCESSING API CALL",
@@ -431,11 +422,9 @@ class DfApiClient {
           apiPath: apiPath,
           retryCount - 1,
           apiCall: apiCall,
-          onFinish: onFinish,
         );
       }
     }
-    onFinish();
     Logger.log(
       "--------> API RESPONSE STATUS CODE ${res?.statusCode}",
       type: LogType.api,
