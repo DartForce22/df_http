@@ -10,8 +10,10 @@
 
 - API Exceptions logged to the firebase crashlytics if initialized
 
-## 1.0.2
+## 2.0.0
 
 - Fixed firebase crashlytics API path logging
 - Added code docs for the df_api_client class
 - Replaced linear pause with exponential backoff + jitter
+- Added the dispose method
+- Changed refresh token logic to fix concurrent calls issue

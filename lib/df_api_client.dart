@@ -2,13 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-import 'dart:ui';
 
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/http.dart';
 
-import '/models/models.dart';
 import '/utils/utils.dart';
 import 'df_http_client_config.dart';
 
@@ -276,54 +274,7 @@ class DfApiClient {
     }
 
     // Handle token refresh if authorization is present and token is expired
-    if (httpApiConfig.refreshToken != null &&
-        httpApiConfig.authorizationPresent() &&
-        _refreshCompleter == null) {
-      if (JwtDecoder.isExpired(httpApiConfig.getAuthorizationToken())) {
-        _refreshCompleter = Completer();
-
-        try {
-          var refreshTokenResult = await httpApiConfig.refreshToken!().timeout(
-            Duration(seconds: 15),
-            onTimeout: () {
-              throw TimeoutException("Token refresh timed out");
-            },
-          );
-
-          switch (refreshTokenResult) {
-            case Success(value: final _):
-              Logger.log(
-                "--------> REFRESHING TOKEN SUCCESS",
-                type: LogType.success,
-                tag: "DF-API-CLIENT",
-              );
-              break;
-            case Failure(exception: final exception):
-              Logger.log(
-                "--------> REFRESHING TOKEN FAILED: $exception",
-                type: LogType.error,
-                tag: "DF-API-CLIENT",
-              );
-              break;
-          }
-        } catch (e) {
-          Logger.log("Token refresh crashed: $e", type: LogType.error);
-        } finally {
-          _refreshCompleter?.complete();
-          _refreshCompleter = null;
-        }
-      }
-    }
-
-    if (httpApiConfig.authorizationPresent() &&
-        httpApiConfig.waitForTokenRefresh) {
-      Logger.log(
-        "--------> REFRESHING TOKEN",
-        type: LogType.warning,
-        tag: "DF-API-CLIENT",
-      );
-      await _refreshCompleter?.future;
-    }
+    await _ensureValidToken();
 
     try {
       res = await apiCall();
@@ -463,6 +414,58 @@ class DfApiClient {
       return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
     } catch (_) {
       return false;
+    }
+  }
+
+  Future<void> _ensureValidToken() async {
+    if (!httpApiConfig.waitForTokenRefresh ||
+        httpApiConfig.refreshToken == null ||
+        !httpApiConfig.authorizationPresent()) {
+      return;
+    }
+    // If a refresh is already happening, code execution MUST wait.
+    while (_refreshCompleter != null) {
+      await _refreshCompleter?.future;
+    }
+
+    //THE CHECK
+    if (JwtDecoder.isExpired(httpApiConfig.getAuthorizationToken())) {
+      // Create the completer IMMEDIATELY before calling any 'await'.
+      // Dart is single-threaded, no other code can run between
+      _refreshCompleter = Completer<void>();
+
+      try {
+        //THE ASYNC WORK
+        //Any other request that enters now
+        //will see _refreshCompleter != null and hit the 'while' loop above.
+        await httpApiConfig.refreshToken!().timeout(
+          const Duration(seconds: 20),
+          onTimeout: () => throw TimeoutException("Token refresh timed out"),
+        );
+      } finally {
+        //THE RELEASE
+        _refreshCompleter?.complete();
+        _refreshCompleter = null;
+      }
+    }
+  }
+
+  /// Close underlying resources used by this client.
+  /// Call this when the client is no longer needed.
+  void dispose() {
+    try {
+      httpClient.close();
+      Logger.log(
+        "DF-API-CLIENT httpClient closed",
+        type: LogType.api,
+        tag: "DF-API-CLIENT",
+      );
+    } catch (e) {
+      Logger.log(
+        "Failed closing httpClient: $e",
+        type: LogType.warning,
+        tag: "DF-API-CLIENT",
+      );
     }
   }
 }
