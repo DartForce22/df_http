@@ -433,8 +433,12 @@ class DfApiClient {
         );
 
         switch (res) {
-          case Success(value: final _):
+          case Success(value: final token):
             Logger.log("REFRESHING TOKEN SUCCESSFUL", type: LogType.api);
+            //Update the headers so the next calls in line don't refresh!
+            httpApiConfig.addHeaderParameters({
+              HttpHeaders.authorizationHeader: "Bearer $token",
+            });
             break;
           case Failure(exception: Exception e):
             throw TimeoutException("Token refresh failed $e");
