@@ -27,15 +27,11 @@ const int maxDelayMs = 60000;
 /// [DfHttpClientConfig].
 class DfApiClient {
   /// Creates a new API client with the given HTTP configuration.
-  DfApiClient({required this.httpApiConfig});
-
-  final httpClient = http.Client();
-
-  /// Global stream to notify the UI about internet connection status
-  static final StreamController<bool> _connectionController =
-      StreamController<bool>.broadcast();
-
-  static Stream<bool> get onConnectivityChanged => _connectionController.stream;
+  DfApiClient({
+    required this.httpApiConfig,
+    http.Client? client,
+    this.onErrorRecorded,
+  }) : httpClient = client ?? http.Client();
 
   /// Use [DfApiClient] constructor instead.
   @Deprecated(
@@ -47,6 +43,17 @@ class DfApiClient {
 
   /// HTTP configuration used for all API calls.
   final DfHttpClientConfig httpApiConfig;
+
+  final http.Client httpClient;
+
+  /// Add a callback for recording errors to avoid Firebase dependency in tests
+  final Future<void> Function(Object error, StackTrace? stack)? onErrorRecorded;
+
+  /// Global stream to notify the UI about internet connection status
+  static final StreamController<bool> _connectionController =
+      StreamController<bool>.broadcast();
+
+  static Stream<bool> get onConnectivityChanged => _connectionController.stream;
 
   ///This flag is used to determine whether the application can proceed with API calls,
   /// or all API calls have to be paused until token refreshing is done
@@ -328,19 +335,7 @@ class DfApiClient {
           throw SocketException('No internet connection');
         }
 
-        try {
-          await FirebaseCrashlytics.instance.recordError(
-            e,
-            s,
-            reason: 'a non-fatal error',
-            information: ['df_http'],
-          );
-        } catch (e) {
-          Logger.log(
-            "Failed logging to firebase crashlytics: $e",
-            type: LogType.warning,
-          );
-        }
+        await tryRecordException(exception: e, stack: s);
       }
       final body = res?.body ?? '';
       final snippet = body.length > 200
@@ -367,19 +362,12 @@ class DfApiClient {
           type: LogType.warning,
           tag: "DF-API-CLIENT",
         );
-        try {
-          await FirebaseCrashlytics.instance.recordError(
+
+        await tryRecordException(
+          exception: Exception(
             '--------> RETRY API PATH=($apiPath) CALL AFTER $retryPauseDurationMs milliseconds - $retryCount RETRIES LEFT',
-            null,
-            reason: 'a non-fatal error',
-            information: ['df_http'],
-          );
-        } catch (e) {
-          Logger.log(
-            "Failed logging to firebase crashlytics: $e",
-            type: LogType.warning,
-          );
-        }
+          ),
+        );
 
         await Future<void>.delayed(
           Duration(milliseconds: retryPauseDurationMs),
@@ -489,6 +477,42 @@ class DfApiClient {
         type: LogType.warning,
         tag: "DF-API-CLIENT",
       );
+    }
+  }
+
+  /// Attempts to log an exception to an external monitoring service.
+  ///
+  /// If [onErrorRecorded] is provided in the constructor, the exception
+  /// will be passed to that callback (ideal for unit testing or custom logging).
+  ///
+  /// Otherwise, it defaults to logging via **Firebase Crashlytics** with
+  /// the 'df_http' tag. Failures during the logging process itself are
+  /// caught and printed to the [Logger] to prevent the app from crashing
+  /// while trying to report an error.
+  ///
+  /// Parameters:
+  /// - [exception]: The error object encountered during the API call.
+  /// - [stack]: The stack trace associated with the error for easier debugging.
+  Future<void> tryRecordException({
+    required Exception exception,
+    StackTrace? stack,
+  }) async {
+    if (onErrorRecorded != null) {
+      await onErrorRecorded!(exception, stack);
+    } else {
+      try {
+        await FirebaseCrashlytics.instance.recordError(
+          e,
+          stack,
+          reason: 'a non-fatal error',
+          information: ['df_http'],
+        );
+      } catch (e) {
+        Logger.log(
+          "Failed logging to firebase crashlytics: $e",
+          type: LogType.warning,
+        );
+      }
     }
   }
 }
