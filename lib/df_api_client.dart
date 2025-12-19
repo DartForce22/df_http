@@ -283,7 +283,7 @@ class DfApiClient {
         _connectionController.add(false);
 
         //Checks if there is internet connection
-        var connected = await hasInternetConnection();
+        var connected = await httpApiConfig.hasInternetConnection();
         var maxConnectionCheckingAttempts = 5;
 
         //Seconds to wait before checking internet connection again
@@ -300,7 +300,7 @@ class DfApiClient {
           }
 
           //Checks again if there is internet connection
-          connected = await hasInternetConnection();
+          connected = await httpApiConfig.hasInternetConnection();
 
           Logger.log(
             '--------> CHECKING INTERNET CONNECTION',
@@ -391,19 +391,6 @@ class DfApiClient {
       tag: "DF-API-CLIENT",
     );
     return Uri.parse('${httpApiConfig.baseApiUrl}$apiPath');
-  }
-
-  /// Checks whether the device currently has an active internet connection.
-  ///
-  /// Returns `true` if DNS lookup succeeds, otherwise `false`.
-  Future<bool> hasInternetConnection() async {
-    try {
-      final result = await InternetAddress.lookup('example.com');
-
-      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
-    } catch (_) {
-      return false;
-    }
   }
 
   Future<void> _ensureValidToken() async {

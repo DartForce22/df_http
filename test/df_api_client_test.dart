@@ -32,6 +32,8 @@ void main() {
     config = DfHttpClientConfig(
       baseApiUrl: 'https://api.example.com',
       headers: {HttpHeaders.authorizationHeader: 'Bearer $expiredToken'},
+      maxDelayMs: 100,
+      maxRetryAttempts: 3,
       refreshToken: () async {
         refreshCount++;
         await Future.delayed(
@@ -85,4 +87,58 @@ void main() {
     // Verify refresh was NEVER called
     expect(refreshCount, 0);
   });
+
+  test('should throw SocketException when internetConnectionCheck remains false', () async {
+    config = DfHttpClientConfig(
+      baseApiUrl: 'https://api.example.com',
+      // Mock: Device is always offline
+      internetConnectionCheck: () async => false,
+    );
+
+    apiClient = DfApiClient(httpApiConfig: config, client: mockClient);
+
+    // Mock the initial call to throw a SocketException (triggering the check logic)
+    when(() => mockClient.get(any(), headers: any(named: 'headers')))
+        .thenThrow(const SocketException('No Network'));
+
+    // The client should attempt to check connection 5 times and then throw
+    expect(
+          () => apiClient.get('/test'),
+      throwsA(isA<SocketException>()),
+    );
+  });
+
+  test('should recover when internetConnectionCheck returns true after initially being false', () async {
+    int checkAttempts = 0;
+
+    config = DfHttpClientConfig(
+      baseApiUrl: 'https://api.example.com',
+      internetConnectionCheck: () async {
+        checkAttempts++;
+        // First 2 checks fail, 3rd check succeeds
+        return checkAttempts > 2;
+      },
+    );
+
+    apiClient = DfApiClient(httpApiConfig: config, client: mockClient);
+
+    // 1. Initial call fails with SocketException
+    // 2. Client enters while loop, calls internetConnectionCheck
+    // 3. Once connected is true, it proceeds to rethrow the exception (per current logic)
+    //    or you can verify it finishes the loop.
+
+    when(() => mockClient.get(any(), headers: any(named: 'headers')))
+        .thenThrow(const SocketException('Connection lost'));
+
+    try {
+      await apiClient.get('/test');
+    } catch (e) {
+      // Per your current _processApiCall logic, if it recovers,
+      // it still rethrows the error at the end of the catch block
+      // if retryCount is 0, or retries if retryCount > 0.
+    }
+
+    expect(checkAttempts, greaterThanOrEqualTo(3));
+  });
+
 }

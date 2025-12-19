@@ -21,6 +21,8 @@ class DfHttpClientConfig {
   /// - [maxRetryAttempts]: Maximum number of retry attempts for failed requests.
   /// - [refreshToken]: Callback used to refresh tokens if authentication fails.
   /// - [maxDelayMs]: Represent the maximum waiting time on API retry. Default set to _60000ms_
+  /// - [internetConnectionCheck] Check if the device is really connected to the internet by default it
+  /// check if the 'example.com' is available, the custom logic can be implemented
   /// ---
   /// - [random]: Provide a "seeded" Random in tests so that the retry delay is predictable
   ///
@@ -35,7 +37,10 @@ class DfHttpClientConfig {
     this.refreshToken,
     this.maxDelayMs = 60000,
     Random? random,
-  }) : _rand = random ?? Random();
+    Future<bool> Function()? internetConnectionCheck,
+  })
+      : _rand = random ?? Random(),
+        hasInternetConnection = internetConnectionCheck??_hasInternetConnection;
 
   final int maxDelayMs;
   final String baseApiUrl;
@@ -46,6 +51,8 @@ class DfHttpClientConfig {
   bool waitForTokenRefresh;
   final int maxRetryAttempts;
   Future<Result<String, Exception>> Function()? refreshToken;
+
+  Future<bool> Function() hasInternetConnection;
 
   /// Used to generate random jitter value for the retry waiting time
   final Random _rand;
@@ -128,5 +135,18 @@ class DfHttpClientConfig {
     }
 
     return retryPauseDurationMs;
+  }
+
+  /// Checks whether the device currently has an active internet connection.
+  ///
+  /// Returns `true` if DNS lookup succeeds, otherwise `false`.
+  static Future<bool> _hasInternetConnection() async {
+    try {
+      final result = await InternetAddress.lookup('example.com');
+
+      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
   }
 }
