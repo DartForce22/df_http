@@ -1,15 +1,3 @@
-## 0.0.1
-
-- Created first version
-
-## 1.0.0
-
-- Added API call logs for easier tracking
-
-## 1.0.1
-
-- API Exceptions logged to the firebase crashlytics if initialized
-
 ## 2.0.0
 
 - Fixed firebase crashlytics API path logging
@@ -18,3 +6,15 @@
 - Added the dispose method
 - Changed refresh token logic to fix concurrent calls issue
 - Added the onConnectivityChanged stream in order to notify UI about network changes.
+
+## 1.0.1
+
+- API Exceptions logged to the firebase crashlytics if initialized
+
+## 1.0.0
+
+- Added API call logs for easier tracking
+
+## 0.0.1
+
+- Created first version
