@@ -31,10 +31,10 @@ class DfApiClient {
 
   final httpClient = http.Client();
 
-  /// Returns a copy of this client with updated configuration.
-  ///
-  /// Useful when only part of the configuration needs to be changed
-  /// (e.g. headers, base URL, timeout).
+  /// Use [DfApiClient] constructor instead.
+  @Deprecated(
+    'Use [DfApiClient] constructor instead, copyWith will be removed in future versions.',
+  )
   DfApiClient copyWith({DfHttpClientConfig? httpApiConfig}) {
     return DfApiClient(httpApiConfig: httpApiConfig ?? this.httpApiConfig);
   }
