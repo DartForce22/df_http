@@ -9,8 +9,8 @@ class MockClient extends Mock implements http.Client {}
 
 void main() {
   late MockClient mockClient;
-  late final DfHttpClientConfig config;
-  late final DfApiClient apiClient;
+  late DfHttpClientConfig config;
+  late DfApiClient apiClient;
   int refreshCount = 0;
   const longLivedToken =
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjI1MzQwMjMwMDc5OSwic3ViIjoiMTIzNDU2Nzg5MCIsIm5hbWUiOiJUZXN0IFVzZXIiLCJpYXQiOjE1MTYyMzkwMjJ9.bW9ja19zaWduYXR1cmVfaGVyZV9ub3RfdmFsaWRhdGVkX2luX3VuaXRfdGVzdHM";
@@ -71,4 +71,18 @@ void main() {
       expect(config.getAuthorizationToken(), contains(longLivedToken));
     },
   );
+
+  test('should NOT refresh if token is valid', () async {
+    //Explicitly set the "good" state for this test
+    config.replaceHeaders({
+      HttpHeaders.authorizationHeader: "Bearer $longLivedToken",
+    });
+    when(() => mockClient.get(any(), headers: any(named: 'headers')))
+        .thenAnswer((_) async => http.Response('{}', 200));
+
+    await apiClient.get('/some-path');
+
+    // Verify refresh was NEVER called
+    expect(refreshCount, 0);
+  });
 }
