@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
@@ -39,7 +40,7 @@ class DfApiClient {
 
   ///This flag is used to determine whether the application can proceed with API calls,
   /// or all API calls have to be paused until token refreshing is done
-  static bool _refreshTokenInProgress = false;
+  static Completer<void>? _refreshCompleter;
 
   /// Executes a HTTP GET request for the given [apiPath].
   ///
@@ -267,45 +268,46 @@ class DfApiClient {
     // Handle token refresh if authorization is present and token is expired
     if (httpApiConfig.refreshToken != null &&
         httpApiConfig.authorizationPresent() &&
-        !_refreshTokenInProgress) {
+        _refreshCompleter == null) {
       if (JwtDecoder.isExpired(httpApiConfig.getAuthorizationToken())) {
-        _refreshTokenInProgress = true;
+        _refreshCompleter = Completer();
 
-        var refreshTokenResult = await httpApiConfig.refreshToken!();
+        try {
+          var refreshTokenResult = await httpApiConfig.refreshToken!();
 
-        switch (refreshTokenResult) {
-          case Success(value: final _):
-            Logger.log(
-              "--------> REFRESHING TOKEN SUCCESS",
-              type: LogType.success,
-              tag: "DF-API-CLIENT",
-            );
-            _refreshTokenInProgress = false;
-            break;
-          case Failure(exception: final exception):
-            _refreshTokenInProgress = false;
-            Logger.log(
-              "--------> REFRESHING TOKEN FAILED: $exception",
-              type: LogType.error,
-              tag: "DF-API-CLIENT",
-            );
-            break;
+          switch (refreshTokenResult) {
+            case Success(value: final _):
+              Logger.log(
+                "--------> REFRESHING TOKEN SUCCESS",
+                type: LogType.success,
+                tag: "DF-API-CLIENT",
+              );
+              break;
+            case Failure(exception: final exception):
+              Logger.log(
+                "--------> REFRESHING TOKEN FAILED: $exception",
+                type: LogType.error,
+                tag: "DF-API-CLIENT",
+              );
+              break;
+          }
+        } catch (e) {
+          Logger.log("Token refresh crashed: $e", type: LogType.error);
+        } finally {
+          _refreshCompleter?.complete();
+          _refreshCompleter = null;
         }
       }
     }
 
-    //Pausing API calls if the token is being refreshed, and if API call have
-    //auth header
-    while (_refreshTokenInProgress &&
-        httpApiConfig.authorizationPresent() &&
+    if (httpApiConfig.authorizationPresent() &&
         httpApiConfig.waitForTokenRefresh) {
-      await Future.delayed(const Duration(milliseconds: 400), () {
-        Logger.log(
-          "--------> REFRESHING TOKEN",
-          type: LogType.warning,
-          tag: "DF-API-CLIENT",
-        );
-      });
+      Logger.log(
+        "--------> REFRESHING TOKEN",
+        type: LogType.warning,
+        tag: "DF-API-CLIENT",
+      );
+      await _refreshCompleter?.future;
     }
 
     try {
