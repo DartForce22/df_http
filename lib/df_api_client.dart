@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 
 import 'package:df_http/df_http.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -11,7 +10,6 @@ import 'package:http/http.dart';
 import '/utils/utils.dart';
 
 const List<int> _retryStatusCodes = [502, 503, 504];
-const int maxDelayMs = 60000;
 
 /// Centralized HTTP API client used for all network calls.
 ///
@@ -58,9 +56,6 @@ class DfApiClient {
   ///This flag is used to determine whether the application can proceed with API calls,
   /// or all API calls have to be paused until token refreshing is done
   Completer<void>? _refreshCompleter;
-
-  /// Used to generate random jitter value for the retry waiting time
-  final _rand = Random();
 
   /// Executes a HTTP GET request for the given [apiPath].
   ///
@@ -273,18 +268,9 @@ class DfApiClient {
     Response? res;
 
     // Exponential backoff with jitter
-    final attemptsUsed = (httpApiConfig.maxRetryAttempts - retryCount);
-    final baseMs = 500; // base delay in ms
-    final cappedAttempts = min(attemptsUsed, 10); // prevents huge shifts
-    final exponential =
-        baseMs * (1 << cappedAttempts); // base * 2^cappedAttempts
-    final jitter = _rand.nextInt(200); // 0..199 ms jitter
-    var retryPauseDurationMs = exponential + jitter;
-
-    //Prevents too long retry awaits
-    if (retryPauseDurationMs > maxDelayMs) {
-      retryPauseDurationMs = maxDelayMs;
-    }
+    var retryPauseDurationMs = httpApiConfig.calculateRetryWaitingPeriod(
+      retryCount,
+    );
 
     // Handle token refresh if authorization is present and token is expired
     await _ensureValidToken();
@@ -502,7 +488,7 @@ class DfApiClient {
     } else {
       try {
         await FirebaseCrashlytics.instance.recordError(
-          e,
+          exception,
           stack,
           reason: 'a non-fatal error',
           information: ['df_http'],

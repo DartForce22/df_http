@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import '/models/result.dart';
 
@@ -19,6 +20,8 @@ class DfHttpClientConfig {
   /// - [waitForTokenRefresh]: Whether requests should wait until token refresh completes.
   /// - [maxRetryAttempts]: Maximum number of retry attempts for failed requests.
   /// - [refreshToken]: Callback used to refresh tokens if authentication fails.
+  /// ---
+  /// - [random]: Provide a "seeded" Random in tests so that the retry delay is predictable
   ///
   DfHttpClientConfig({
     required this.baseApiUrl,
@@ -29,8 +32,12 @@ class DfHttpClientConfig {
     this.waitForTokenRefresh = true,
     this.maxRetryAttempts = 3,
     this.refreshToken,
-  });
+    Random? random,
+  }) : _rand = random ?? Random();
 
+  ///Represent the maximum waiting time on API retry
+  ///- Default set to _60000ms_
+  final int maxDelayMs = 60000;
   final String baseApiUrl;
   final Encoding? encoding;
   Map<String, String> headers;
@@ -39,6 +46,9 @@ class DfHttpClientConfig {
   bool waitForTokenRefresh;
   final int maxRetryAttempts;
   Future<Result<String, Exception>> Function()? refreshToken;
+
+  /// Used to generate random jitter value for the retry waiting time
+  final Random _rand;
 
   void addHeaderParameters(Map<String, String> headers) {
     this.headers.addAll(headers);
@@ -65,7 +75,7 @@ class DfHttpClientConfig {
     if (authorizationToken != null) {
       authorizationToken = authorizationToken.replaceFirst("Bearer ", "");
     }
-    return headers[HttpHeaders.authorizationHeader];
+    return authorizationToken;
   }
 
   DfHttpClientConfig clone() {
@@ -100,5 +110,23 @@ class DfHttpClientConfig {
       timeout: timeout ?? this.timeout,
       waitForTokenRefresh: waitForTokenRefresh ?? this.waitForTokenRefresh,
     );
+  }
+
+  int calculateRetryWaitingPeriod(int retryCount) {
+    // Exponential backoff with jitter
+    final attemptsUsed = (maxRetryAttempts - retryCount);
+    final baseMs = 500; // base delay in ms
+    final cappedAttempts = min(attemptsUsed, 10); // prevents huge shifts
+    final exponential =
+        baseMs * (1 << cappedAttempts); // base * 2^cappedAttempts
+    final jitter = _rand.nextInt(200); // 0..199 ms jitter
+    var retryPauseDurationMs = exponential + jitter;
+
+    //Prevents too long retry awaits
+    if (retryPauseDurationMs > maxDelayMs) {
+      retryPauseDurationMs = maxDelayMs;
+    }
+
+    return retryPauseDurationMs;
   }
 }
