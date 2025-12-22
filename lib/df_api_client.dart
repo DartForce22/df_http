@@ -1,42 +1,81 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:ui';
 
+import 'package:df_http/df_http.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/http.dart';
 
-import '/models/models.dart';
 import '/utils/utils.dart';
-import 'df_http_client_config.dart';
 
-///An instance of this class is used to make all API
-///calls with predefined logic
+const List<int> _retryStatusCodes = [502, 503, 504];
+
+/// Centralized HTTP API client used for all network calls.
+///
+/// `DfApiClient` wraps the `http` package and provides:
+/// - Unified GET/POST/PUT/PATCH/DELETE methods
+/// - Automatic retry logic
+/// - Token refresh handling
+/// - Network connectivity checks
+/// - Timeout handling
+/// - Firebase Crashlytics error reporting
+///
+/// All requests are executed using configuration provided by
+/// [DfHttpClientConfig].
 class DfApiClient {
-  DfApiClient({required this.httpApiConfig});
+  /// Creates a new API client with the given HTTP configuration.
+  DfApiClient({
+    required this.httpApiConfig,
+    http.Client? client,
+    this.onErrorRecorded,
+  }) : httpClient = client ?? http.Client();
 
+  /// Use [DfApiClient] constructor instead.
+  @Deprecated(
+    'Use [DfApiClient] constructor instead, copyWith will be removed in future versions.',
+  )
   DfApiClient copyWith({DfHttpClientConfig? httpApiConfig}) {
     return DfApiClient(httpApiConfig: httpApiConfig ?? this.httpApiConfig);
   }
 
+  /// HTTP configuration used for all API calls.
   final DfHttpClientConfig httpApiConfig;
+
+  final http.Client httpClient;
+
+  /// Add a callback for recording errors to avoid Firebase dependency in tests
+  final Future<void> Function(Object error, StackTrace? stack)? onErrorRecorded;
+
+  /// Global stream to notify the UI about internet connection status
+  static final StreamController<bool> _connectionController =
+      StreamController<bool>.broadcast();
+
+  static Stream<bool> get onConnectivityChanged => _connectionController.stream;
 
   ///This flag is used to determine whether the application can proceed with API calls,
   /// or all API calls have to be paused until token refreshing is done
-  static bool _refreshTokenInProgress = false;
+  Completer<void>? _refreshCompleter;
 
+  /// Executes a HTTP GET request for the given [apiPath].
+  ///
+  /// Applies:
+  /// - Base URL resolution
+  /// - Authorization headers
+  /// - Timeout handling
+  /// - Retry logic
   Future<Response?> get(String apiPath) async {
     Logger.log(
       "--------> START OF GET API CALL <--------",
       type: LogType.api,
       tag: "DF-API-CLIENT",
     );
-    final client = http.Client();
     Uri apiUri = _generateApiUri(apiPath);
     return _processApiCall(
+      apiPath: apiPath,
       httpApiConfig.maxRetryAttempts,
       apiCall: () async {
-        return await client
+        return await httpClient
             .get(apiUri, headers: httpApiConfig.headers)
             .timeout(
               Duration(seconds: httpApiConfig.timeout),
@@ -45,10 +84,13 @@ class DfApiClient {
               ),
             );
       },
-      onFinish: client.close,
     );
   }
 
+  /// Executes a HTTP POST request for the given [apiPath].
+  ///
+  /// If [jsonEncodeBody] is `true`, the [body] will be JSON-encoded
+  /// before sending.
   Future<Response?> post(
     String apiPath, {
     Object? body,
@@ -60,16 +102,16 @@ class DfApiClient {
       tag: "DF-API-CLIENT",
     );
     Object? requestBody = body;
-    final client = http.Client();
 
     if (jsonEncodeBody && body != null) {
       requestBody = jsonEncode(body);
     }
     Uri apiUri = _generateApiUri(apiPath);
     return _processApiCall(
+      apiPath: apiPath,
       httpApiConfig.maxRetryAttempts,
       apiCall: () async {
-        return await client
+        return await httpClient
             .post(
               apiUri,
               encoding: httpApiConfig.encoding,
@@ -83,10 +125,12 @@ class DfApiClient {
               ),
             );
       },
-      onFinish: client.close,
     );
   }
 
+  /// Executes a HTTP PATCH request for the given [apiPath].
+  ///
+  /// If [jsonEncodeBody] is `true`, the [body] will be JSON-encoded.
   Future<Response?> patch(
     String apiPath, {
     Object? body,
@@ -98,7 +142,6 @@ class DfApiClient {
       tag: "DF-API-CLIENT",
     );
     Object? requestBody = body;
-    final client = http.Client();
 
     if (jsonEncodeBody && body != null) {
       requestBody = jsonEncode(body);
@@ -106,9 +149,10 @@ class DfApiClient {
 
     Uri apiUri = _generateApiUri(apiPath);
     return _processApiCall(
+      apiPath: apiPath,
       httpApiConfig.maxRetryAttempts,
       apiCall: () async {
-        return await client
+        return await httpClient
             .patch(
               apiUri,
               encoding: httpApiConfig.encoding,
@@ -122,10 +166,12 @@ class DfApiClient {
               ),
             );
       },
-      onFinish: client.close,
     );
   }
 
+  /// Executes a HTTP PUT request for the given [apiPath].
+  ///
+  /// If [jsonEncodeBody] is `true`, the [body] will be JSON-encoded.
   Future<Response?> put(
     String apiPath, {
     Object? body,
@@ -137,7 +183,6 @@ class DfApiClient {
       tag: "DF-API-CLIENT",
     );
     Object? requestBody = body;
-    final client = http.Client();
 
     if (jsonEncodeBody && body != null) {
       requestBody = jsonEncode(body);
@@ -145,9 +190,10 @@ class DfApiClient {
 
     Uri apiUri = _generateApiUri(apiPath);
     return _processApiCall(
+      apiPath: apiPath,
       httpApiConfig.maxRetryAttempts,
       apiCall: () async {
-        return await client
+        return await httpClient
             .put(
               apiUri,
               encoding: httpApiConfig.encoding,
@@ -161,26 +207,28 @@ class DfApiClient {
               ),
             );
       },
-      onFinish: client.close,
     );
   }
 
+  /// Executes a HTTP DELETE request for the given [apiPath].
+  ///
+  /// Supports an optional request body and JSON encoding.
   Future<Response?> delete(
     String apiPath, {
     Object? body,
     bool jsonEncodeBody = true,
   }) async {
     Object? requestBody = body;
-    final client = http.Client();
 
     if (jsonEncodeBody && body != null) {
       requestBody = jsonEncode(body);
     }
     Uri apiUri = _generateApiUri(apiPath);
     return _processApiCall(
+      apiPath: apiPath,
       httpApiConfig.maxRetryAttempts,
       apiCall: () async {
-        return await client
+        return await httpClient
             .delete(
               apiUri,
               encoding: httpApiConfig.encoding,
@@ -194,14 +242,23 @@ class DfApiClient {
               ),
             );
       },
-      onFinish: client.close,
     );
   }
 
+  /// Core request execution pipeline.
+  ///
+  /// Responsibilities:
+  /// - Token expiration detection
+  /// - Token refresh synchronization
+  /// - Retry handling for failed requests
+  /// - Internet connectivity recovery
+  /// - Crashlytics logging
+  ///
+  /// [retryCount] determines how many retry attempts are still allowed.
   Future<Response?> _processApiCall(
     int retryCount, {
     required Future<Response> Function() apiCall,
-    required VoidCallback onFinish,
+    required String apiPath,
   }) async {
     Logger.log(
       "--------> PROCESSING API CALL",
@@ -209,63 +266,31 @@ class DfApiClient {
       tag: "DF-API-CLIENT",
     );
     Response? res;
-    final retryPauseDuration =
-        500 * ((httpApiConfig.maxRetryAttempts + 1) - retryCount);
 
-    if (httpApiConfig.refreshToken != null &&
-        httpApiConfig.authorizationPresent() &&
-        !_refreshTokenInProgress) {
-      if (JwtDecoder.isExpired(httpApiConfig.getAuthorizationToken())) {
-        _refreshTokenInProgress = true;
+    // Exponential backoff with jitter
+    var retryPauseDurationMs = httpApiConfig.calculateRetryWaitingPeriod(
+      retryCount,
+    );
 
-        var refreshTokenResult = await httpApiConfig.refreshToken!();
-
-        switch (refreshTokenResult) {
-          case Success(value: final _):
-            Logger.log(
-              "--------> REFRESHING TOKEN SUCCESS",
-              type: LogType.success,
-              tag: "DF-API-CLIENT",
-            );
-            _refreshTokenInProgress = false;
-            break;
-          case Failure(exception: final exception):
-            _refreshTokenInProgress = false;
-            Logger.log(
-              "--------> REFRESHING TOKEN FAILED: $exception",
-              type: LogType.error,
-              tag: "DF-API-CLIENT",
-            );
-            break;
-        }
-      }
-    }
-
-    //Pausing API calls if the token is being refreshed, and if API call have
-    //auth header
-    while (_refreshTokenInProgress &&
-        httpApiConfig.authorizationPresent() &&
-        httpApiConfig.waitForTokenRefresh) {
-      await Future.delayed(const Duration(milliseconds: 400), () {
-        Logger.log(
-          "--------> REFRESHING TOKEN",
-          type: LogType.warning,
-          tag: "DF-API-CLIENT",
-        );
-      });
-    }
+    // Handle token refresh if authorization is present and token is expired
+    await _ensureValidToken();
 
     try {
       res = await apiCall();
     } catch (e, s) {
       if (e is SocketException) {
+        // Notify UI that we lost connection
+        _connectionController.add(false);
+
         //Checks if there is internet connection
-        var connected = await hasInternetConnection();
+        var connected = await httpApiConfig.hasInternetConnection();
+        var maxConnectionCheckingAttempts = 5;
 
         //Seconds to wait before checking internet connection again
         var secondsToWait = 5;
 
-        while (!connected) {
+        while (!connected && maxConnectionCheckingAttempts > 0) {
+          maxConnectionCheckingAttempts--;
           await Future<void>.delayed(Duration(seconds: secondsToWait));
 
           if (secondsToWait < 10) {
@@ -275,7 +300,7 @@ class DfApiClient {
           }
 
           //Checks again if there is internet connection
-          connected = await hasInternetConnection();
+          connected = await httpApiConfig.hasInternetConnection();
 
           Logger.log(
             '--------> CHECKING INTERNET CONNECTION',
@@ -284,59 +309,62 @@ class DfApiClient {
           );
         }
 
-        try {
-          await FirebaseCrashlytics.instance.recordError(
-            e,
-            s,
-            reason: 'a non-fatal error',
-            information: ['df_http'],
-          );
-        } catch (e) {
+        if (connected) {
+          // Notify UI that we are back online
+          _connectionController.add(true);
+        } else {
           Logger.log(
-            "Failed logging to firebase crashlytics: $e",
-            type: LogType.warning,
+            'No internet after $maxConnectionCheckingAttempts attempts',
+            type: LogType.error,
           );
+          // either rethrow a SocketException or return null to let caller handle
+          throw SocketException('No internet connection');
         }
+
+        await tryRecordException(exception: e, stack: s);
       }
+      final body = res?.body ?? '';
+      final snippet = body.length > 200
+          ? '${body.substring(0, 200)}... (truncated)'
+          : body;
 
       Logger.log(
-        '--------> $e \n API CALL EXCEPTION \n RESPONSE BODY= ${res?.body}',
+        '--------> $e \n API CALL EXCEPTION \n RESPONSE BODY= $snippet',
         type: LogType.error,
         tag: "DF-API-CLIENT",
       );
-      //Exception needs to be handled
+
+      if (retryCount == 0) {
+        rethrow;
+      }
     }
 
-    if (res == null || res.statusCode == 502 || res.statusCode == 503) {
+    // Retry on gateway/server errors
+    if (res == null || _retryStatusCodes.contains(res.statusCode)) {
       //If API call failed, this will retry API request
       if (retryCount > 0) {
         Logger.log(
-          '--------> RETRY API CALL AFTER $retryPauseDuration milliseconds - $retryCount RETRIES LEFT',
+          '--------> RETRY API CALL AFTER $retryPauseDurationMs milliseconds - $retryCount RETRIES LEFT',
           type: LogType.warning,
           tag: "DF-API-CLIENT",
         );
-        try {
-          await FirebaseCrashlytics.instance.recordError(
-            '--------> RETRY API (${res?.request?.url}) CALL AFTER $retryPauseDuration milliseconds - $retryCount RETRIES LEFT',
-            null,
-            reason: 'a non-fatal error',
-            information: ['df_http'],
-          );
-        } catch (e) {
-          Logger.log(
-            "Failed logging to firebase crashlytics: $e",
-            type: LogType.warning,
-          );
-        }
-        await Future<void>.delayed(Duration(milliseconds: retryPauseDuration));
+
+        await tryRecordException(
+          exception: Exception(
+            '--------> RETRY API PATH=($apiPath) CALL AFTER $retryPauseDurationMs milliseconds - $retryCount RETRIES LEFT',
+          ),
+        );
+
+        await Future<void>.delayed(
+          Duration(milliseconds: retryPauseDurationMs),
+        );
         return _processApiCall(
-          --retryCount,
+          apiPath: apiPath,
+          retryCount - 1,
           apiCall: apiCall,
-          onFinish: onFinish,
         );
       }
     }
-    onFinish();
     Logger.log(
       "--------> API RESPONSE STATUS CODE ${res?.statusCode}",
       type: LogType.api,
@@ -350,6 +378,7 @@ class DfApiClient {
     return res;
   }
 
+  /// Builds the full request [Uri] from the base API URL and [apiPath].
   Uri _generateApiUri(String apiPath) {
     Logger.log(
       "--------> GENERATING API URL",
@@ -364,13 +393,103 @@ class DfApiClient {
     return Uri.parse('${httpApiConfig.baseApiUrl}$apiPath');
   }
 
-  Future<bool> hasInternetConnection() async {
-    try {
-      final result = await InternetAddress.lookup('example.com');
+  Future<void> _ensureValidToken() async {
+    if (!httpApiConfig.waitForTokenRefresh ||
+        httpApiConfig.refreshToken == null ||
+        !httpApiConfig.authorizationPresent()) {
+      return;
+    }
+    // If a refresh is already happening, code execution MUST wait.
+    while (_refreshCompleter != null) {
+      await _refreshCompleter?.future;
+    }
 
-      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
-    } catch (_) {
-      return false;
+    //THE CHECK
+    if (JwtDecoder.isExpired(httpApiConfig.getAuthorizationToken())) {
+      // Create the completer IMMEDIATELY before calling any 'await'.
+      // Dart is single-threaded, no other code can run between
+      _refreshCompleter = Completer<void>();
+
+      try {
+        //THE ASYNC WORK
+        //Any other request that enters now
+        //will see _refreshCompleter != null and hit the 'while' loop above.
+        var res = await httpApiConfig.refreshToken!().timeout(
+          const Duration(seconds: 20),
+          onTimeout: () => throw TimeoutException("Token refresh timed out"),
+        );
+
+        switch (res) {
+          case Success(value: final token):
+            Logger.log("REFRESHING TOKEN SUCCESSFUL", type: LogType.api);
+            //Update the headers so the next calls in line don't refresh!
+            httpApiConfig.addHeaderParameters({
+              HttpHeaders.authorizationHeader: "Bearer $token",
+            });
+            break;
+          case Failure(exception: Exception e):
+            throw TimeoutException("Token refresh failed $e");
+        }
+      } finally {
+        //THE RELEASE
+        _refreshCompleter?.complete();
+        _refreshCompleter = null;
+      }
+    }
+  }
+
+  /// Close underlying resources used by this client.
+  /// Call this when the client is no longer needed.
+  void dispose() {
+    try {
+      httpClient.close();
+      Logger.log(
+        "DF-API-CLIENT httpClient closed",
+        type: LogType.api,
+        tag: "DF-API-CLIENT",
+      );
+    } catch (e) {
+      Logger.log(
+        "Failed closing httpClient: $e",
+        type: LogType.warning,
+        tag: "DF-API-CLIENT",
+      );
+    }
+  }
+
+  /// Attempts to log an exception to an external monitoring service.
+  ///
+  /// If [onErrorRecorded] is provided in the constructor, the exception
+  /// will be passed to that callback (ideal for unit testing or custom logging).
+  ///
+  /// Otherwise, it defaults to logging via **Firebase Crashlytics** with
+  /// the 'df_http' tag. Failures during the logging process itself are
+  /// caught and printed to the [Logger] to prevent the app from crashing
+  /// while trying to report an error.
+  ///
+  /// Parameters:
+  /// - [exception]: The error object encountered during the API call.
+  /// - [stack]: The stack trace associated with the error for easier debugging.
+  Future<void> tryRecordException({
+    required Exception exception,
+    StackTrace? stack,
+  }) async {
+    if (onErrorRecorded != null) {
+      await onErrorRecorded!(exception, stack);
+    } else {
+      try {
+        await FirebaseCrashlytics.instance.recordError(
+          exception,
+          stack,
+          reason: 'a non-fatal error',
+          information: ['df_http'],
+        );
+      } catch (e) {
+        Logger.log(
+          "Failed logging to firebase crashlytics: $e",
+          type: LogType.warning,
+        );
+      }
     }
   }
 }
