@@ -245,6 +245,43 @@ class DfApiClient {
     );
   }
 
+  /// Executes a HTTP Multipart request for the given [apiPath] and [method].
+  ///
+  /// Supports an optional [fields] and [files].
+  Future<Response?> multipart(
+    String method,
+    String apiPath, {
+    Map<String, String>? fields,
+    List<MultipartFile>? files,
+  }) async {
+    Uri apiUri = _generateApiUri(apiPath);
+
+    return _processApiCall(
+      httpApiConfig.maxRetryAttempts,
+      apiPath: apiPath,
+      apiCall: () async {
+        final request = MultipartRequest(method, apiUri);
+
+        request.headers.addAll(httpApiConfig.headers);
+
+        if (fields != null) {
+          request.fields.addAll(fields);
+        }
+        if (files != null) {
+          request.files.addAll(files);
+        }
+
+        final streamedResponse = await request.send().timeout(
+          Duration(seconds: httpApiConfig.timeout),
+          onTimeout: () => throw Exception(
+            "API Timeout exception, no response from the server for: $apiPath",
+          ),
+        );
+        return await Response.fromStream(streamedResponse);
+      },
+    );
+  }
+
   /// Core request execution pipeline.
   ///
   /// Responsibilities:
