@@ -245,6 +245,32 @@ class DfApiClient {
     );
   }
 
+  Future<Response?> multipart(
+    String method,
+    String apiPath, {
+    Map<String, String>? fields,
+    List<MultipartFile>? files,
+  }) async {
+    Uri apiUri = _generateApiUri(apiPath);
+
+    return _processApiCall(
+      httpApiConfig.maxRetryAttempts,
+      apiPath: apiPath,
+      apiCall: () async {
+        final request = MultipartRequest(method, apiUri);
+        if (fields != null) {
+          request.fields.addAll(fields);
+        }
+        if (files != null) {
+          request.files.addAll(files);
+        }
+        request.headers.addAll(httpApiConfig.headers);
+        final streamedResponse = await request.send();
+        return await Response.fromStream(streamedResponse);
+      },
+    );
+  }
+
   /// Core request execution pipeline.
   ///
   /// Responsibilities:
