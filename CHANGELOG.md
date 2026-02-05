@@ -1,4 +1,6 @@
 ## 2.0.0
+- Added missing multipart requests method
+## 2.0.0
 - Fixed Firebase Crashlytics API path logging
 - Resolved issues with concurrent refresh token calls
 - Replaced linear retry pause with exponential backoff + jitter
