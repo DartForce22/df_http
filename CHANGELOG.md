@@ -1,4 +1,4 @@
-## 2.0.0
+## 2.0.1
 - Added missing multipart requests method
 ## 2.0.0
 - Fixed Firebase Crashlytics API path logging
