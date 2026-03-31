@@ -1,3 +1,5 @@
+## 2.0.2
+- Added support for request interceptors
 ## 2.0.1
 - Added missing multipart requests method
 ## 2.0.0
