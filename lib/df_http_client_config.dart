@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 
 import '/models/result.dart';
+import 'df_http_interceptor.dart';
 
 /// Configuration object for HTTP API calls used with df_http.
 ///
@@ -36,11 +37,12 @@ class DfHttpClientConfig {
     this.maxRetryAttempts = 3,
     this.refreshToken,
     this.maxDelayMs = 60000,
+    this.interceptors = const [],
     Random? random,
     Future<bool> Function()? internetConnectionCheck,
-  })
-      : _rand = random ?? Random(),
-        hasInternetConnection = internetConnectionCheck??_hasInternetConnection;
+  }) : _rand = random ?? Random(),
+       hasInternetConnection =
+           internetConnectionCheck ?? _hasInternetConnection;
 
   final int maxDelayMs;
   final String baseApiUrl;
@@ -51,6 +53,7 @@ class DfHttpClientConfig {
   bool waitForTokenRefresh;
   final int maxRetryAttempts;
   Future<Result<String, Exception>> Function()? refreshToken;
+  final List<DfHttpInterceptor> interceptors;
 
   Future<bool> Function() hasInternetConnection;
 
@@ -94,6 +97,7 @@ class DfHttpClientConfig {
       retryApiCall: retryApiCall,
       maxRetryAttempts: maxRetryAttempts,
       refreshToken: refreshToken,
+      interceptors: interceptors,
     );
   }
 
@@ -106,6 +110,7 @@ class DfHttpClientConfig {
     bool? waitForTokenRefresh,
     int? maxRetryAttempts,
     Future<Result<String, Exception>> Function()? refreshToken,
+    List<DfHttpInterceptor>? interceptors,
   }) {
     return DfHttpClientConfig(
       baseApiUrl: baseApiUrl ?? this.baseApiUrl,
@@ -116,6 +121,7 @@ class DfHttpClientConfig {
       retryApiCall: retryApiCall ?? this.retryApiCall,
       timeout: timeout ?? this.timeout,
       waitForTokenRefresh: waitForTokenRefresh ?? this.waitForTokenRefresh,
+      interceptors: [...?interceptors],
     );
   }
 

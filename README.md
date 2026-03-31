@@ -10,6 +10,7 @@ A robust, production-ready HTTP client wrapper for Dart and Flutter. Built on to
 - **Stream-Based Status**: Real-time broadcast stream (`onConnectivityChanged`) to notify your UI when the device goes offline or comes back online.
 - **Firebase Crashlytics Integration**: Built-in non-fatal error reporting.
 - **Test-First Design**: Fully injectable dependencies (`http.Client`, `Random`, `internetConnectionCheck`) for deterministic unit testing.
+- **Custom Request Interceptors**: Easily inject auth tokens, headers, or logging globally.
 
 ## Getting Started
 

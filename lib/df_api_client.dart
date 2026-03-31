@@ -304,6 +304,10 @@ class DfApiClient {
     );
     Response? res;
 
+    for (final interceptor in httpApiConfig.interceptors) {
+      await interceptor.onRequest(httpApiConfig.headers);
+    }
+
     // Exponential backoff with jitter
     var retryPauseDurationMs = httpApiConfig.calculateRetryWaitingPeriod(
       retryCount,
