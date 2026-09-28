@@ -1,8 +1,17 @@
+## 2.0.3
+
+- Multipart method fix
+
 ## 2.0.2
+
 - Added support for request interceptors
+
 ## 2.0.1
+
 - Added missing multipart requests method
+
 ## 2.0.0
+
 - Fixed Firebase Crashlytics API path logging
 - Resolved issues with concurrent refresh token calls
 - Replaced linear retry pause with exponential backoff + jitter
@@ -13,6 +22,7 @@
 - Fixed reported bugs
 
 ### 🌐 New Features
+
 - Added `onConnectivityChanged` stream to notify the UI about network changes
 - Added `dispose()` method for proper resource cleanup
 
