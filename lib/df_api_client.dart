@@ -271,12 +271,20 @@ class DfApiClient {
           request.files.addAll(files);
         }
 
-        final streamedResponse = await request.send().timeout(
-          Duration(seconds: httpApiConfig.timeout),
-          onTimeout: () => throw Exception(
-            "API Timeout exception, no response from the server for: $apiPath",
-          ),
-        );
+        // httpClient.put(
+        //   apiUri,
+        //   encoding: httpApiConfig.encoding,
+        //   body: requestBody,
+        //   headers: httpApiConfig.headers,
+        // );
+        final streamedResponse = await httpClient
+            .send(request)
+            .timeout(
+              Duration(seconds: httpApiConfig.timeout),
+              onTimeout: () => throw Exception(
+                "API Timeout exception, no response from the server for: $apiPath",
+              ),
+            );
         return await Response.fromStream(streamedResponse);
       },
     );
