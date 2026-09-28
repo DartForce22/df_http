@@ -271,12 +271,6 @@ class DfApiClient {
           request.files.addAll(files);
         }
 
-        // httpClient.put(
-        //   apiUri,
-        //   encoding: httpApiConfig.encoding,
-        //   body: requestBody,
-        //   headers: httpApiConfig.headers,
-        // );
         final streamedResponse = await httpClient
             .send(request)
             .timeout(
