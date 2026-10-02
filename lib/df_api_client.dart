@@ -25,16 +25,11 @@ const List<int> _retryStatusCodes = [500, 501, 502, 503, 504];
 /// [DfHttpClientConfig].
 class DfApiClient {
   /// Creates a new API client with the given HTTP configuration.
-  DfApiClient({
-    required this.httpApiConfig,
-    http.Client? client,
-    this.onErrorRecorded,
-  }) : httpClient = client ?? http.Client();
+  DfApiClient({required this.httpApiConfig, http.Client? client, this.onErrorRecorded})
+    : httpClient = client ?? http.Client();
 
   /// Use [DfApiClient] constructor instead.
-  @Deprecated(
-    'Use [DfApiClient] constructor instead, copyWith will be removed in future versions.',
-  )
+  @Deprecated('Use [DfApiClient] constructor instead, copyWith will be removed in future versions.')
   DfApiClient copyWith({DfHttpClientConfig? httpApiConfig}) {
     return DfApiClient(httpApiConfig: httpApiConfig ?? this.httpApiConfig);
   }
@@ -48,8 +43,7 @@ class DfApiClient {
   final Future<void> Function(Object error, StackTrace? stack)? onErrorRecorded;
 
   /// Global stream to notify the UI about internet connection status
-  static final StreamController<bool> _connectionController =
-      StreamController<bool>.broadcast();
+  static final StreamController<bool> _connectionController = StreamController<bool>.broadcast();
 
   static Stream<bool> get onConnectivityChanged => _connectionController.stream;
 
@@ -65,11 +59,7 @@ class DfApiClient {
   /// - Timeout handling
   /// - Retry logic
   Future<Response?> get(String apiPath) async {
-    Logger.log(
-      "--------> START OF GET API CALL <--------",
-      type: LogType.api,
-      tag: "DF-API-CLIENT",
-    );
+    Logger.log("--------> START OF GET API CALL <--------", type: LogType.api, tag: "DF-API-CLIENT");
     Uri apiUri = _generateApiUri(apiPath);
     return _processApiCall(
       apiPath: apiPath,
@@ -79,9 +69,7 @@ class DfApiClient {
             .get(apiUri, headers: httpApiConfig.headers)
             .timeout(
               Duration(seconds: httpApiConfig.timeout),
-              onTimeout: () => throw Exception(
-                "API Timeout exception, no response from the server for: $apiPath",
-              ),
+              onTimeout: () => throw Exception("API Timeout exception, no response from the server for: $apiPath"),
             );
       },
     );
@@ -91,16 +79,8 @@ class DfApiClient {
   ///
   /// If [jsonEncodeBody] is `true`, the [body] will be JSON-encoded
   /// before sending.
-  Future<Response?> post(
-    String apiPath, {
-    Object? body,
-    bool jsonEncodeBody = true,
-  }) async {
-    Logger.log(
-      "--------> START OF POST API CALL <--------",
-      type: LogType.api,
-      tag: "DF-API-CLIENT",
-    );
+  Future<Response?> post(String apiPath, {Object? body, bool jsonEncodeBody = true}) async {
+    Logger.log("--------> START OF POST API CALL <--------", type: LogType.api, tag: "DF-API-CLIENT");
     Object? requestBody = body;
 
     if (jsonEncodeBody && body != null) {
@@ -112,17 +92,10 @@ class DfApiClient {
       httpApiConfig.maxRetryAttempts,
       apiCall: () async {
         return await httpClient
-            .post(
-              apiUri,
-              encoding: httpApiConfig.encoding,
-              body: requestBody,
-              headers: httpApiConfig.headers,
-            )
+            .post(apiUri, encoding: httpApiConfig.encoding, body: requestBody, headers: httpApiConfig.headers)
             .timeout(
               Duration(seconds: httpApiConfig.timeout),
-              onTimeout: () => throw Exception(
-                "API Timeout exception, no response from the server for: $apiPath",
-              ),
+              onTimeout: () => throw Exception("API Timeout exception, no response from the server for: $apiPath"),
             );
       },
     );
@@ -131,16 +104,8 @@ class DfApiClient {
   /// Executes a HTTP PATCH request for the given [apiPath].
   ///
   /// If [jsonEncodeBody] is `true`, the [body] will be JSON-encoded.
-  Future<Response?> patch(
-    String apiPath, {
-    Object? body,
-    bool jsonEncodeBody = true,
-  }) async {
-    Logger.log(
-      "--------> START OF PATCH API CALL <--------",
-      type: LogType.api,
-      tag: "DF-API-CLIENT",
-    );
+  Future<Response?> patch(String apiPath, {Object? body, bool jsonEncodeBody = true}) async {
+    Logger.log("--------> START OF PATCH API CALL <--------", type: LogType.api, tag: "DF-API-CLIENT");
     Object? requestBody = body;
 
     if (jsonEncodeBody && body != null) {
@@ -153,17 +118,10 @@ class DfApiClient {
       httpApiConfig.maxRetryAttempts,
       apiCall: () async {
         return await httpClient
-            .patch(
-              apiUri,
-              encoding: httpApiConfig.encoding,
-              body: requestBody,
-              headers: httpApiConfig.headers,
-            )
+            .patch(apiUri, encoding: httpApiConfig.encoding, body: requestBody, headers: httpApiConfig.headers)
             .timeout(
               Duration(seconds: httpApiConfig.timeout),
-              onTimeout: () => throw Exception(
-                "API Timeout exception, no response from the server for: $apiPath",
-              ),
+              onTimeout: () => throw Exception("API Timeout exception, no response from the server for: $apiPath"),
             );
       },
     );
@@ -172,16 +130,8 @@ class DfApiClient {
   /// Executes a HTTP PUT request for the given [apiPath].
   ///
   /// If [jsonEncodeBody] is `true`, the [body] will be JSON-encoded.
-  Future<Response?> put(
-    String apiPath, {
-    Object? body,
-    bool jsonEncodeBody = true,
-  }) async {
-    Logger.log(
-      "--------> START OF PUT API CALL <--------",
-      type: LogType.api,
-      tag: "DF-API-CLIENT",
-    );
+  Future<Response?> put(String apiPath, {Object? body, bool jsonEncodeBody = true}) async {
+    Logger.log("--------> START OF PUT API CALL <--------", type: LogType.api, tag: "DF-API-CLIENT");
     Object? requestBody = body;
 
     if (jsonEncodeBody && body != null) {
@@ -194,17 +144,10 @@ class DfApiClient {
       httpApiConfig.maxRetryAttempts,
       apiCall: () async {
         return await httpClient
-            .put(
-              apiUri,
-              encoding: httpApiConfig.encoding,
-              body: requestBody,
-              headers: httpApiConfig.headers,
-            )
+            .put(apiUri, encoding: httpApiConfig.encoding, body: requestBody, headers: httpApiConfig.headers)
             .timeout(
               Duration(seconds: httpApiConfig.timeout),
-              onTimeout: () => throw Exception(
-                "API Timeout exception, no response from the server for: $apiPath",
-              ),
+              onTimeout: () => throw Exception("API Timeout exception, no response from the server for: $apiPath"),
             );
       },
     );
@@ -213,11 +156,7 @@ class DfApiClient {
   /// Executes a HTTP DELETE request for the given [apiPath].
   ///
   /// Supports an optional request body and JSON encoding.
-  Future<Response?> delete(
-    String apiPath, {
-    Object? body,
-    bool jsonEncodeBody = true,
-  }) async {
+  Future<Response?> delete(String apiPath, {Object? body, bool jsonEncodeBody = true}) async {
     Object? requestBody = body;
 
     if (jsonEncodeBody && body != null) {
@@ -229,17 +168,10 @@ class DfApiClient {
       httpApiConfig.maxRetryAttempts,
       apiCall: () async {
         return await httpClient
-            .delete(
-              apiUri,
-              encoding: httpApiConfig.encoding,
-              body: requestBody,
-              headers: httpApiConfig.headers,
-            )
+            .delete(apiUri, encoding: httpApiConfig.encoding, body: requestBody, headers: httpApiConfig.headers)
             .timeout(
               Duration(seconds: httpApiConfig.timeout),
-              onTimeout: () => throw Exception(
-                "API Timeout exception, no response from the server for: $apiPath",
-              ),
+              onTimeout: () => throw Exception("API Timeout exception, no response from the server for: $apiPath"),
             );
       },
     );
@@ -275,9 +207,7 @@ class DfApiClient {
             .send(request)
             .timeout(
               Duration(seconds: httpApiConfig.timeout),
-              onTimeout: () => throw Exception(
-                "API Timeout exception, no response from the server for: $apiPath",
-              ),
+              onTimeout: () => throw Exception("API Timeout exception, no response from the server for: $apiPath"),
             );
         return await Response.fromStream(streamedResponse);
       },
@@ -299,11 +229,7 @@ class DfApiClient {
     required Future<Response> Function() apiCall,
     required String apiPath,
   }) async {
-    Logger.log(
-      "--------> PROCESSING API CALL",
-      type: LogType.api,
-      tag: "DF-API-CLIENT",
-    );
+    Logger.log("--------> PROCESSING API CALL", type: LogType.api, tag: "DF-API-CLIENT");
     Response? res;
 
     for (final interceptor in httpApiConfig.interceptors) {
@@ -311,9 +237,7 @@ class DfApiClient {
     }
 
     // Exponential backoff with jitter
-    var retryPauseDurationMs = httpApiConfig.calculateRetryWaitingPeriod(
-      retryCount,
-    );
+    var retryPauseDurationMs = httpApiConfig.calculateRetryWaitingPeriod(retryCount);
 
     // Handle token refresh if authorization is present and token is expired
     await _ensureValidToken();
@@ -345,21 +269,14 @@ class DfApiClient {
           //Checks again if there is internet connection
           connected = await httpApiConfig.hasInternetConnection();
 
-          Logger.log(
-            '--------> CHECKING INTERNET CONNECTION',
-            type: LogType.warning,
-            tag: "DF-API-CLIENT",
-          );
+          Logger.log('--------> CHECKING INTERNET CONNECTION', type: LogType.warning, tag: "DF-API-CLIENT");
         }
 
         if (connected) {
           // Notify UI that we are back online
           _connectionController.add(true);
         } else {
-          Logger.log(
-            'No internet after $maxConnectionCheckingAttempts attempts',
-            type: LogType.error,
-          );
+          Logger.log('No internet after $maxConnectionCheckingAttempts attempts', type: LogType.error);
           // either rethrow a SocketException or return null to let caller handle
           throw SocketException('No internet connection');
         }
@@ -367,9 +284,7 @@ class DfApiClient {
         await tryRecordException(exception: e, stack: s);
       }
       final body = res?.body ?? '';
-      final snippet = body.length > 200
-          ? '${body.substring(0, 200)}... (truncated)'
-          : body;
+      final snippet = body.length > 200 ? '${body.substring(0, 200)}... (truncated)' : body;
 
       Logger.log(
         '--------> $e \n API CALL EXCEPTION \n RESPONSE BODY= $snippet',
@@ -394,45 +309,24 @@ class DfApiClient {
 
         await tryRecordException(
           exception: Exception(
-            '--------> RETRY API PATH=($apiPath) CALL AFTER $retryPauseDurationMs milliseconds - $retryCount RETRIES LEFT',
+            '-------->STATUS CODE (${res?.statusCode}) RETRY API PATH=($apiPath) CALL AFTER $retryPauseDurationMs milliseconds - $retryCount RETRIES LEFT',
           ),
+          body: res?.body,
         );
 
-        await Future<void>.delayed(
-          Duration(milliseconds: retryPauseDurationMs),
-        );
-        return _processApiCall(
-          apiPath: apiPath,
-          retryCount - 1,
-          apiCall: apiCall,
-        );
+        await Future<void>.delayed(Duration(milliseconds: retryPauseDurationMs));
+        return _processApiCall(apiPath: apiPath, retryCount - 1, apiCall: apiCall);
       }
     }
-    Logger.log(
-      "--------> API RESPONSE STATUS CODE ${res?.statusCode}",
-      type: LogType.api,
-      tag: "DF-API-CLIENT",
-    );
-    Logger.log(
-      "--------> END OF API CALL <--------\n",
-      type: LogType.api,
-      tag: "DF-API-CLIENT",
-    );
+    Logger.log("--------> API RESPONSE STATUS CODE ${res?.statusCode}", type: LogType.api, tag: "DF-API-CLIENT");
+    Logger.log("--------> END OF API CALL <--------\n", type: LogType.api, tag: "DF-API-CLIENT");
     return res;
   }
 
   /// Builds the full request [Uri] from the base API URL and [apiPath].
   Uri _generateApiUri(String apiPath) {
-    Logger.log(
-      "--------> GENERATING API URL",
-      type: LogType.api,
-      tag: "DF-API-CLIENT",
-    );
-    Logger.log(
-      "--------> API URL '${httpApiConfig.baseApiUrl}$apiPath'",
-      type: LogType.api,
-      tag: "DF-API-CLIENT",
-    );
+    Logger.log("--------> GENERATING API URL", type: LogType.api, tag: "DF-API-CLIENT");
+    Logger.log("--------> API URL '${httpApiConfig.baseApiUrl}$apiPath'", type: LogType.api, tag: "DF-API-CLIENT");
     return Uri.parse('${httpApiConfig.baseApiUrl}$apiPath');
   }
 
@@ -466,9 +360,7 @@ class DfApiClient {
           case Success(value: final token):
             Logger.log("REFRESHING TOKEN SUCCESSFUL", type: LogType.api);
             //Update the headers so the next calls in line don't refresh!
-            httpApiConfig.addHeaderParameters({
-              HttpHeaders.authorizationHeader: "Bearer $token",
-            });
+            httpApiConfig.addHeaderParameters({HttpHeaders.authorizationHeader: "Bearer $token"});
             break;
           case Failure(exception: Exception e):
             throw TimeoutException("Token refresh failed $e");
@@ -486,17 +378,9 @@ class DfApiClient {
   void dispose() {
     try {
       httpClient.close();
-      Logger.log(
-        "DF-API-CLIENT httpClient closed",
-        type: LogType.api,
-        tag: "DF-API-CLIENT",
-      );
+      Logger.log("DF-API-CLIENT httpClient closed", type: LogType.api, tag: "DF-API-CLIENT");
     } catch (e) {
-      Logger.log(
-        "Failed closing httpClient: $e",
-        type: LogType.warning,
-        tag: "DF-API-CLIENT",
-      );
+      Logger.log("Failed closing httpClient: $e", type: LogType.warning, tag: "DF-API-CLIENT");
     }
   }
 
@@ -513,10 +397,7 @@ class DfApiClient {
   /// Parameters:
   /// - [exception]: The error object encountered during the API call.
   /// - [stack]: The stack trace associated with the error for easier debugging.
-  Future<void> tryRecordException({
-    required Exception exception,
-    StackTrace? stack,
-  }) async {
+  Future<void> tryRecordException({required Exception exception, StackTrace? stack, String? body}) async {
     if (onErrorRecorded != null) {
       await onErrorRecorded!(exception, stack);
     } else {
@@ -524,14 +405,11 @@ class DfApiClient {
         await FirebaseCrashlytics.instance.recordError(
           exception,
           stack,
-          reason: 'a non-fatal error',
+          reason: body ?? 'a non-fatal error',
           information: ['df_http'],
         );
       } catch (e) {
-        Logger.log(
-          "Failed logging to firebase crashlytics: $e",
-          type: LogType.warning,
-        );
+        Logger.log("Failed logging to firebase crashlytics: $e", type: LogType.warning);
       }
     }
   }
