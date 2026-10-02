@@ -1,3 +1,7 @@
+## 2.0.5
+
+- Added more information when an exception is logged
+
 ## 2.0.4
 
 - Updated status code list, which should be retried/logged
