@@ -9,7 +9,7 @@ import 'package:http/http.dart';
 
 import '/utils/utils.dart';
 
-const List<int> _retryStatusCodes = [502, 503, 504];
+const List<int> _retryStatusCodes = [500, 501, 502, 503, 504];
 
 /// Centralized HTTP API client used for all network calls.
 ///
